@@ -1,0 +1,43 @@
+<!--
+  Bundle.wxs
+  Setup .exe for Citadel (WiX bundle that contains the MSI).
+
+  Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
+  Date: November 9, 2026
+  SPDX-License-Identifier: GPL-2.0-only
+
+  This program is free software: you can redistribute it and/or modify it under the terms of
+  the GNU General Public License, version 2, as published by the Free Software Foundation.
+  It is distributed WITHOUT ANY WARRANTY. See the LICENSE file for details.
+-->
+<!--
+  citadel-setup.exe: a WiX bundle that installs the MSI with Citadel's own setup window (installer\SetupUI),
+  in English or Spanish, chosen from a menu. The same window opens to uninstall from "Installed apps".
+  Installing a newer version upgrades the old one.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Bundle Name="Citadel"
+          Manufacturer="Gabriel Castiglia"
+          Copyright="Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only."
+          Version="$(var.Version)"
+          UpgradeCode="aa20b4e5-6d2d-476b-a681-f9db6b487e75"
+          IconSourceFile="..\..\src\Citadel\citadel.ico"
+          AboutUrl="https://github.com/Gabriel-Castiglia/citadel-windows"
+          DisableModify="yes">
+    <!-- The setup window: a .NET Framework 4.7.2 program, which Windows 10 and 11 already include. -->
+    <BootstrapperApplication SourceFile="$(var.SetupUiDir)CitadelSetup.exe">
+      <Payload SourceFile="$(var.SetupUiDir)CitadelSetup.exe.config" />
+      <Payload SourceFile="$(var.SetupUiDir)WixToolset.BootstrapperApplicationApi.dll" />
+      <Payload SourceFile="$(var.SetupUiDir)mbanative.dll" />
+    </BootstrapperApplication>
+
+    <!-- Interface language chosen in the setup window; handed to the MSI, which stores it for the app. -->
+    <Variable Name="CitadelLanguage" Value="en" />
+
+    <Chain>
+      <MsiPackage Id="CitadelMsi" SourceFile="$(var.MsiPath)">
+        <MsiProperty Name="CITADELLANGUAGE" Value="[CitadelLanguage]" />
+      </MsiPackage>
+    </Chain>
+  </Bundle>
+</Wix>

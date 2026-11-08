@@ -1,0 +1,79 @@
+<!--
+  Package.wxs
+  MSI package for Citadel.
+
+  Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
+  Date: November 9, 2026
+  SPDX-License-Identifier: GPL-2.0-only
+
+  This program is free software: you can redistribute it and/or modify it under the terms of
+  the GNU General Public License, version 2, as published by the Free Software Foundation.
+  It is distributed WITHOUT ANY WARRANTY. See the LICENSE file for details.
+-->
+<!--
+  - Per-machine install into "Program Files\Citadel" (requires administrator rights).
+  - Start menu shortcut and an "Installed apps" entry with its icon.
+  - MajorUpgrade: installing a newer version replaces the previous one automatically.
+  - Closes a running Citadel before replacing or removing its files.
+  - Stores the interface language chosen in the setup window (HKLM\Software\Citadel\Language).
+  Each user's data (%APPDATA%\Citadel: conversations, rules, memories, settings) is never touched,
+  so it survives upgrades and uninstalls.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  <Package Name="Citadel"
+           Manufacturer="Gabriel Castiglia"
+           Version="$(var.Version)"
+           UpgradeCode="a645ad6e-5c9e-4999-9341-3a077b4e0728"
+           Scope="perMachine"
+           Language="1033"
+           Codepage="1252">
+    <SummaryInformation Description="Citadel: local AI chat for Windows" Manufacturer="Gabriel Castiglia" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Citadel is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="citadel.ico" SourceFile="..\..\src\Citadel\citadel.ico" />
+    <Property Id="ARPPRODUCTICON" Value="citadel.ico" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+    <Property Id="ARPCOMMENTS" Value="Local AI chat for Windows. License: GPL-2.0-only." />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/Gabriel-Castiglia/citadel-windows" />
+    <!-- Interface language chosen in the setup window ("en" or "es"); the app uses it on its first start. -->
+    <Property Id="CITADELLANGUAGE" Value="en" />
+
+    <!-- Close the running app before its files are replaced or removed. -->
+    <util:CloseApplication Id="CloseCitadel" Target="Citadel.exe" CloseMessage="yes" TerminateProcess="0" RebootPrompt="no" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Citadel">
+        <Component Id="CitadelExe">
+          <File Id="CitadelExe" Source="$(var.PublishDir)Citadel.exe" KeyPath="yes">
+            <!-- Start menu shortcut (all users). -->
+            <Shortcut Id="CitadelShortcut" Directory="ProgramMenuFolder" Name="Citadel" Description="Local AI chat for Windows"
+                      WorkingDirectory="INSTALLFOLDER" Advertise="no" />
+          </File>
+          <RegistryValue Root="HKLM" Key="Software\Citadel" Name="InstallFolder" Type="string" Value="[INSTALLFOLDER]" />
+          <RegistryValue Root="HKLM" Key="Software\Citadel" Name="Language" Type="string" Value="[CITADELLANGUAGE]" />
+        </Component>
+        <Component Id="License">
+          <File Id="License" Source="..\..\LICENSE" Name="LICENSE.txt" KeyPath="yes" />
+        </Component>
+        <Component Id="Readme">
+          <File Id="Readme" Source="..\..\README.txt" KeyPath="yes" />
+        </Component>
+        <Component Id="ReadmeEs">
+          <File Id="ReadmeEs" Source="..\..\README.es.txt" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder" />
+
+    <Feature Id="Main" Title="Citadel">
+      <ComponentRef Id="CitadelExe" />
+      <ComponentRef Id="License" />
+      <ComponentRef Id="Readme" />
+      <ComponentRef Id="ReadmeEs" />
+    </Feature>
+  </Package>
+</Wix>

@@ -1,0 +1,57 @@
+<!--
+  CitadelSetup.csproj
+  Project file for the Citadel setup window.
+
+  Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
+  Date: November 9, 2026
+  SPDX-License-Identifier: GPL-2.0-only
+
+  This program is free software: you can redistribute it and/or modify it under the terms of
+  the GNU General Public License, version 2, as published by the Free Software Foundation.
+  It is distributed WITHOUT ANY WARRANTY. See the LICENSE file for details.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The setup window shown by citadel-setup.exe: a WiX 5 bootstrapper application. It runs on the
+    .NET Framework 4.7.2 that ships with Windows 10 (version 1803 and later) and Windows 11, so the
+    setup needs no runtime of its own.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>CitadelSetup</AssemblyName>
+    <RootNamespace>Citadel.Setup</RootNamespace>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PlatformTarget>x64</PlatformTarget>
+    <SelfContained>false</SelfContained>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <DebugType>embedded</DebugType>
+    <ApplicationIcon>..\..\src\Citadel\citadel.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Product>Citadel</Product>
+    <Description>Citadel setup</Description>
+    <!-- Same version as the app, read from the only place where it is set: src\Citadel\Citadel.csproj. -->
+    <Version>$([System.Text.RegularExpressions.Regex]::Match($([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)..\..\src\Citadel\Citadel.csproj')), '&lt;Version&gt;([^&lt;]+)&lt;/Version&gt;').Groups[1].Value)</Version>
+    <Authors>Gabriel Castiglia</Authors>
+    <Company>Gabriel Castiglia</Company>
+    <Copyright>Copyright (C) 2026 Gabriel Castiglia</Copyright>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Debug data names source files from the repository root (/_/), not from the folder where it was built. -->
+    <PathMap>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\'))=/_/</PathMap>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The same interface texts helper as the app. -->
+    <Compile Include="..\..\src\Citadel\Loc.cs" Link="Loc.cs" />
+    <Resource Include="..\..\src\Citadel\citadel.ico" Link="citadel.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.BootstrapperApplicationApi" Version="5.0.2" />
+  </ItemGroup>
+
+</Project>
