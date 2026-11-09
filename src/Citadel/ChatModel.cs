@@ -64,6 +64,12 @@ internal sealed class ChatModel
         set { Settings.Current.Model = value; Settings.Current.Save(); Changed?.Invoke(); }
     }
 
+    /// <summary>Whether each installed model can reason, from its Ollama capabilities.</summary>
+    public Dictionary<string, bool> ReasoningModels { get; } = [];
+
+    /// <summary>Reason applies only to models that can reason; unknown models are given the benefit of the doubt.</summary>
+    public bool CanReason => !ReasoningModels.TryGetValue(SelectedModel, out bool can) || can;
+
     public bool Reason
     {
         get => Settings.Current.Reason;
@@ -95,6 +101,8 @@ internal sealed class ChatModel
             Reachable = true;
             if (list.Count > 0 && !list.Contains(SelectedModel))
                 Settings.Current.Model = list.Contains(DefaultModel) ? DefaultModel : list[0];
+            foreach (string name in list.Where(n => !ReasoningModels.ContainsKey(n)))
+                try { ReasoningModels[name] = (await Ollama.Capabilities(name)).Contains("thinking"); } catch { }
             try { Loaded = await Ollama.LoadedModels(); } catch { Loaded = []; }
         }
         catch
@@ -204,21 +212,6 @@ internal sealed class ChatModel
         Changed?.Invoke();
     }
 
-    public const string ToEnglish = "Translate to English:", ToSpanish = "Traduce al español:";
-
-    /// <summary>Fills the composer with a translation request for the attached text.</summary>
-    public void Translate(bool toEnglish)
-    {
-        string prefix = toEnglish ? ToEnglish : ToSpanish;
-        string body = string.Join("\n\n", Attachments.Select(a => a.Text)).Trim();
-        string typed = Composer.Trim();
-        string existing = typed.StartsWith(ToEnglish) || typed.StartsWith(ToSpanish) ? "" : typed;
-        string text = body.Length == 0 ? existing : body;
-        Composer = text.Length == 0 ? prefix + " " : prefix + "\n\n" + text;
-        if (body.Length > 0) Attachments.Clear();
-        Changed?.Invoke();
-    }
-
     public void Send()
     {
         string text = Composer.Trim();
@@ -281,7 +274,7 @@ internal sealed class ChatModel
 
     private async Task RunAnswer(Conversation c)
     {
-        bool think = Reason;
+        bool think = Reason && CanReason;
         string model = SelectedModel;
         var wire = WireMessages(c);
         var answer = new ChatMessage { Role = Role.Assistant, Reasoned = think };

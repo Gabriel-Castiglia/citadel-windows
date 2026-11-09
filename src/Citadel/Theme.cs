@@ -89,7 +89,7 @@ internal static class Theme
     public const string GlyphEdit = "\uE70F", GlyphSearch = "\uE721", GlyphSettings = "\uE713", GlyphGlobe = "\uE774",
         GlyphInfo = "\uE946", GlyphSend = "\uE724", GlyphStop = "\uE71A", GlyphCopy = "\uE8C8", GlyphCheck = "\uE73E",
         GlyphBulb = "\uE82F", GlyphChevronRight = "\uE76C", GlyphChevronDown = "\uE70D", GlyphBookmark = "\uE8F1",
-        GlyphDocument = "\uE8A5", GlyphTranslate = "\uE8C1", GlyphTrash = "\uE74D", GlyphFolder = "\uE8B7",
+        GlyphDocument = "\uE8A5", GlyphTrash = "\uE74D", GlyphFolder = "\uE8B7",
         GlyphRefresh = "\uE72C", GlyphWarning = "\uE7BA", GlyphClose = "\uE711", GlyphDownload = "\uE896";
 
     public static TextBlock Icon(string glyph, double size = 14, Brush brush = null) => new()
@@ -114,7 +114,7 @@ internal static class Theme
             Content = row, Cursor = Cursors.Hand, ToolTip = tooltip, Focusable = false,
             Template = FlatTemplate(), Padding = new Thickness(8, 5, 8, 5), Background = Brushes.Transparent,
         };
-        button.Click += (s, e) => click();
+        button.Click += (s, e) => click?.Invoke();
         return button;
     }
 

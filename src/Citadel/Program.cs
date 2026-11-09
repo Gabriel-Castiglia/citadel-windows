@@ -98,7 +98,7 @@ internal static class Program
         switch (which)
         {
             case "settings":
-                target = new SettingsWindow { Owner = main };
+                target = new SettingsWindow { Owner = main, Model = model };
                 target.Show();
                 break;
             case "about":

@@ -1,7 +1,7 @@
 Citadel para Windows
 ====================
 
-Gabriel Castiglia · 9 de noviembre de 2026 · versión 1.0.0 · licencia GPL-2.0
+Gabriel Castiglia · 9 de noviembre de 2026 · versión 1.1.0 · licencia GPL-2.0
 
 English (README.txt) · Español
 
@@ -11,10 +11,11 @@ Manual en PDF: docs/Citadel-manual-es.pdf
 
 Citadel es una app de chat para Windows 10 y 11 que conversa con modelos de lenguaje que corren en
 la misma computadora mediante Ollama <https://ollama.com>. Nada de lo que escribes sale de la
-computadora: la app solo se conecta con Ollama en 127.0.0.1:11434. Está escrita en C# con .NET 10 y
-WPF, usa el estilo oscuro de Windows 11 con tu color de énfasis y su interfaz está en inglés y en
-español. La versión para macOS, con las mismas funciones, tiene su propio repositorio:
-https://github.com/Gabriel-Castiglia/citadel.
+computadora: la app solo se conecta con Ollama en 127.0.0.1:11434, salvo que elijas usar el Ollama
+de otra computadora tuya por SSH (ver Ollama en otra computadora (#ollama-en-otra-computadora)).
+Está escrita en C# con .NET 10 y WPF, usa el estilo oscuro de Windows 11 con tu color de énfasis y
+su interfaz está en inglés y en español. La versión para macOS, con las mismas funciones, tiene su
+propio repositorio: https://github.com/Gabriel-Castiglia/citadel.
 
 Citadel es una ventana de chat, no un agente. El modelo no puede abrir archivos, ejecutar comandos
 ni navegar por la web. Recibe lo que escribes, los archivos de texto que adjuntas, unas reglas que
@@ -99,14 +100,35 @@ lápiz empiezan una nueva, cuyo título es la primera línea del primer mensaje.
 una conversación se la renombra o se la elimina; eliminar pide confirmación y borra su archivo del
 disco. El campo de búsqueda filtra por título sin distinguir mayúsculas ni tildes.
 
-Modelo y estado
----------------
+Modelos
+-------
 
-La lista de modelos, arriba a la derecha, muestra los modelos instalados en Ollama y los vuelve a
-leer cada vez que se abre. La línea bajo el cuadro de texto dice si Ollama responde, si el modelo
-está cargado o se cargará con el próximo mensaje, qué está haciendo (cargando, razonando,
-escribiendo) con los segundos transcurridos, y la velocidad de la última respuesta. Cuando Ollama no
-responde, esa misma línea dice cómo iniciarlo.
+La lista de modelos, arriba a la derecha, muestra todos los modelos instalados en Ollama y los
+vuelve a leer cada vez que se abre; eliges uno y el próximo mensaje va a ese. La elección se
+recuerda, y debajo de cada respuesta figura el modelo que la escribió, así que en una misma
+conversación se pueden comparar varios. Para agregar un modelo, instálalo desde una terminal y
+vuelve a abrir la lista:
+
+    ollama pull gemma3:12b
+
+Sirve cualquier modelo de chat de la biblioteca de Ollama <https://ollama.com/library>. Los modelos
+que no pueden razonar (Ollama no incluye «thinking» entre sus capacidades) aparecen en la lista con
+«(sin Razonar)», y con uno de ellos elegido el botón Razonar queda atenuado y su ayuda dice por qué.
+Citadel le pregunta a Ollama las capacidades de cada modelo al listarlos, así que un modelo nuevo
+queda clasificado en cuanto aparece.
+
+Ollama le da a cada modelo una ventana de contexto de unos pocos miles de tokens, salvo que el
+modelo indique otra. Para conversaciones largas o adjuntos grandes, crea una variante con una
+ventana mayor, como en Requisitos (#requisitos), y elígela en la lista. Una ventana mayor ocupa más
+memoria.
+
+Estado
+------
+
+La línea bajo el cuadro de texto dice si Ollama responde y dónde (en esta computadora, o en otra por
+SSH), si el modelo está cargado o se cargará con el próximo mensaje, qué está haciendo (cargando,
+razonando, escribiendo) con los segundos transcurridos, y la velocidad de la última respuesta.
+Cuando Ollama no responde, esa misma línea dice cómo iniciarlo, o da el error de SSH.
 
 Razonar
 -------
@@ -115,7 +137,8 @@ El botón Razonar hace que el modelo piense antes de contestar; mientras está a
 color de énfasis. El razonamiento va en un bloque atenuado sobre la respuesta. El bloque queda
 plegado, mostrando la última línea mientras el modelo piensa, y se abre con un clic. Razonar es más
 lento y mucho más preciso en cuentas, conteos de letras o palabras, lógica y fechas. Sin razonar, el
-modelo contesta enseguida y alcanza para explicaciones, redacción, traducción y código.
+modelo contesta enseguida y alcanza para explicaciones, redacción, traducción y código. Razonar solo
+está disponible con los modelos que saben razonar (ver Modelos (#modelos)).
 
 Con Razonar activo, una respuesta puede escribir hasta 8.000 tokens; sin él, hasta 3.000. En
 Notas técnicas (#notas-técnicas) están las mediciones que llevaron a esos valores.
@@ -126,14 +149,11 @@ Detener
 Mientras se escribe una respuesta, el botón de enviar pasa a ser Detener (también Esc). Cierra la
 conexión y Ollama deja de generar; lo escrito hasta ese momento queda, marcado como «Detenido».
 
-Adjuntos y traducción
----------------------
+Adjuntos
+--------
 
 Arrastra un archivo .txt o .md al cuadro de texto para adjuntar su texto al próximo mensaje; una
-etiqueta muestra el nombre del archivo y su largo, con un botón para quitarlo. El menú Traducir
-llena el cuadro con «Translate to English:» o «Traduce al español:» seguido del texto adjunto, listo
-para enviar. Las reglas le piden al modelo que deje sin cambios el código, las rutas, los comandos,
-los números y los nombres.
+etiqueta muestra el nombre del archivo y su largo, con un botón para quitarlo.
 
 Memorias
 --------
@@ -163,12 +183,13 @@ lo comprueba.
 Ajustes
 -------
 
-El botón Ajustes, abajo en la barra lateral (o Ctrl+,), abre una ventana con dos pestañas.
+El botón Ajustes, abajo en la barra lateral (o Ctrl+,), abre una ventana con tres pestañas.
 
   Pestaña    Qué contiene
   ---------- --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   Memorias   La carpeta de memorias (Elegir…, o Por defecto para volver a %APPDATA%\Citadel\memories), la lista de memorias con su línea del índice, Abrir carpeta, Mostrar en el Explorador para cada memoria, y Eliminar, que pide confirmación y borra el archivo y su línea del índice.
   Reglas     Las reglas que van al principio de cada pedido, editables. Guardar (Ctrl+S) las escribe; Descartar cambios deshace lo editado; Restaurar las originales vuelve a las reglas de fábrica.
+  Ollama     Dónde corre Ollama: en esta computadora, o en otra por SSH (ver Ollama en otra computadora (#ollama-en-otra-computadora)). Aplicar y probar se conecta enseguida y lista los modelos que encuentra.
 
 Cualquier carpeta puede ser la carpeta de memorias, también una que use otra herramienta, mientras
 mantenga el mismo formato de _index.md.
@@ -200,11 +221,49 @@ que en la nube, cosa que no puede saber.
 Idioma
 ------
 
-La interfaz está en inglés y en español. El botón del globo, abajo en la barra lateral, abre el menú
-de idioma (Idioma / Language, escrito en los dos idiomas para encontrarlo desde cualquiera); el
-cambio se aplica al instante y se recuerda. En el primer arranque Citadel usa el idioma elegido
-durante la instalación, o inglés cuando corre sin instalar. El idioma de la interfaz no cambia el de
-las respuestas: el modelo contesta en el idioma en que le escribes.
+La interfaz está en inglés y en español. El botón del globo, arriba a la derecha junto a la lista de
+modelos, muestra el idioma actual y abre el menú de idioma; el cambio se aplica al instante y se
+recuerda. En el primer arranque Citadel usa el idioma elegido durante la instalación, o inglés
+cuando corre sin instalar. El idioma de la interfaz no cambia el de las respuestas: el modelo
+contesta en el idioma en que le escribes.
+
+Ollama en otra computadora
+--------------------------
+
+Un modelo demasiado grande para esta computadora puede correr en otra computadora tuya, y Citadel
+puede usarlo por SSH. Citadel abre el comando ssh que trae Windows, con un túnel desde un puerto
+local libre hasta el puerto 11434 de esa computadora, manda cada pedido por ahí y lo cierra al
+salir. El puerto de Ollama nunca se abre a la red: a la otra computadora solo le hace falta aceptar
+SSH. Las conversaciones, las reglas y las memorias se quedan en esta computadora; la otra recibe
+cada pedido cuando se envía, como pasa siempre con Ollama.
+
+En la computadora que corre el modelo:
+
+1.  Instala Ollama y los modelos, como en Requisitos (#requisitos). A Ollama le basta escuchar en
+    127.0.0.1, que es lo que hace de fábrica.
+
+2.  Enciende el servidor SSH: en una Mac, Ajustes del Sistema → General → Compartir → Sesión remota;
+    en Windows, Configuración → Sistema → Características opcionales → Servidor OpenSSH, y después
+    inicia el servicio sshd.
+
+3.  Autoriza la llave pública de esta computadora (%USERPROFILE%\.ssh\id_ed25519.pub; si no existe,
+    créala con ssh-keygen -t ed25519). En el ~/.ssh/authorized_keys del usuario de la otra
+    computadora, una línea como esta deja que esa llave reenvíe el puerto de Ollama y nada más (ni
+    terminal, ni comandos, ni otros puertos):
+
+        restrict,port-forwarding,permitopen="127.0.0.1:11434",command="/usr/bin/false" ssh-ed25519 AAAA… nombre
+
+    En un servidor Windows ese archivo es C:\Users\<usuario>\.ssh\authorized_keys para un usuario
+    estándar, o C:\ProgramData\ssh\administrators_authorized_keys para un administrador, y el
+    comando forzado es command="cmd /c exit".
+
+En esta computadora, abre Ajustes → Ollama, elige «En otra computadora, por SSH», escribe el destino
+(usuario@equipo, o un nombre Host de %USERPROFILE%\.ssh\config) y haz clic en Aplicar y probar. La
+línea de resultado lista los modelos que hay allá, y la línea de estado bajo el cuadro de texto dice
+«Ollama en (SSH)». Citadel nunca pide contraseña (corre ssh en modo por lotes), así que la llave
+tiene que funcionar sin una o estar cargada en el agente de OpenSSH. La primera conexión a un equipo
+nuevo guarda su llave en known_hosts; si esa llave cambia después, la conexión falla, como en
+cualquier cliente SSH. Si la conexión se corta, Citadel la vuelve a abrir con el pedido siguiente.
 
 Teclado
 -------
@@ -221,14 +280,14 @@ Teclado
 Archivos
 --------
 
-  Qué                                                                              Dónde
-  -------------------------------------------------------------------------------- -----------------------------------------------------------------------
-  Programa instalado                                                               C:\Program Files\Citadel, con LICENSE.txt, README.txt y README.es.txt
-  Conversaciones                                                                   %APPDATA%\Citadel\conversations\, un archivo JSON cada una
-  Reglas                                                                           %APPDATA%\Citadel\rules.md
-  Memorias (carpeta por defecto)                                                   %APPDATA%\Citadel\memories\, con _index.md
-  Ajustes (idioma, modelo, Razonar, carpeta de memorias, posición de la ventana)   %APPDATA%\Citadel\settings.json
-  Registro de errores, si algo falla                                               %APPDATA%\Citadel\citadel.log, de menos de 512 KB
+  Qué                                                                                           Dónde
+  --------------------------------------------------------------------------------------------- -----------------------------------------------------------------------
+  Programa instalado                                                                            C:\Program Files\Citadel, con LICENSE.txt, README.txt y README.es.txt
+  Conversaciones                                                                                %APPDATA%\Citadel\conversations\, un archivo JSON cada una
+  Reglas                                                                                        %APPDATA%\Citadel\rules.md
+  Memorias (carpeta por defecto)                                                                %APPDATA%\Citadel\memories\, con _index.md
+  Ajustes (idioma, modelo, Razonar, carpeta de memorias, destino SSH, posición de la ventana)   %APPDATA%\Citadel\settings.json
+  Registro de errores, si algo falla                                                            %APPDATA%\Citadel\citadel.log, de menos de 512 KB
 
 Los archivos se escriben en UTF-8 sin marca de orden de bytes. Las conversaciones son JSON simple
 con el mismo formato que la versión para macOS, así que se pueden copiar de una a otra.
@@ -295,6 +354,13 @@ Notas técnicas
   Después Citadel pasa el nombre del archivo a minúsculas con guiones, reescribe la línea _Updated
   con la fecha y el modelo reales, y reemplaza la línea vieja del índice del mismo archivo en lugar
   de agregar otra.
+- Ollama contesta con un error («does not support thinking») a un pedido con "think": true para un
+  modelo sin esa capacidad. Citadel lee las capacidades en /api/show y a esos modelos les manda
+  "think": false, esté como esté el botón Razonar.
+- El túnel SSH corre ssh -N con BatchMode=yes, ExitOnForwardFailure=yes y señales de vida cada 15
+  segundos; Citadel espera a que el extremo local acepte conexiones antes de enviar. ssh.exe corre
+  dentro de un objeto de trabajo que Windows cierra junto con Citadel, así que el túnel termina
+  aunque Citadel se cierre a la fuerza.
 
 Créditos
 --------

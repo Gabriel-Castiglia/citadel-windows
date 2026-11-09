@@ -25,7 +25,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <!-- The single place where the version is set; scripts\build.ps1 and the installers read it from here. -->
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Product>Citadel</Product>
     <Description>Local AI chat for Windows</Description>

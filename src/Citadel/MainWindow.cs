@@ -119,9 +119,12 @@ internal sealed class MainWindow : Window
 
     private void Build()
     {
+        // These panels outlive a rebuild (language change): free them from the old layout first.
+        foreach (var kept in new FrameworkElement[] { conversationList, messagesPanel, attachmentPanel }) Detach(kept);
         answerViews.Clear();
         shownConversation = null;
         shownCount = -1;
+        welcomeShown = false;
         var root = new Grid();
         root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(264) });
         root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1) });
@@ -178,9 +181,6 @@ internal sealed class MainWindow : Window
 
         var bottom = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(10, 6, 10, 12) };
         bottom.Children.Add(Theme.FlatButton(Theme.GlyphSettings, tr("Ajustes", "Settings"), OpenSettings, "Ctrl+,"));
-        var language = Theme.FlatButton(Theme.GlyphGlobe, null, null, "Idioma / Language");
-        language.Click += (s, e) => LanguageMenu(language);
-        bottom.Children.Add(language);
         bottom.Children.Add(Theme.FlatButton(Theme.GlyphInfo, null, OpenAbout, tr("Acerca de Citadel", "About Citadel")));
         DockPanel.SetDock(bottom, Dock.Bottom);
         panel.Children.Add(bottom);
@@ -204,7 +204,7 @@ internal sealed class MainWindow : Window
 
     private void LanguageMenu(Button anchor)
     {
-        var menu = new ContextMenu { PlacementTarget = anchor, Placement = PlacementMode.Top };
+        var menu = new ContextMenu { PlacementTarget = anchor, Placement = PlacementMode.Bottom };
         menu.Items.Add(new MenuItem { Header = "Idioma / Language", IsEnabled = false });
         foreach (var (lang, name) in new[] { (UiLanguage.En, "English"), (UiLanguage.Es, "Español") })
         {
@@ -229,16 +229,24 @@ internal sealed class MainWindow : Window
         chatArea.RowDefinitions.Add(new RowDefinition());
         chatArea.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        // Header: title and model picker.
+        // Header: title, language and model picker.
         var header = new DockPanel { Margin = new Thickness(22, 10, 16, 10), Height = 34 };
         modelPicker = new ComboBox { MinWidth = 200, FontSize = 12.5, ToolTip = tr("Modelo de Ollama", "Ollama model"), VerticalAlignment = VerticalAlignment.Center };
         modelPicker.DropDownOpened += async (s, e) => await model.RefreshStatus();
         modelPicker.SelectionChanged += (s, e) =>
         {
-            if (!updatingPicker && modelPicker.SelectedItem is string name && name != model.SelectedModel) model.SelectedModel = name;
+            if (!updatingPicker && modelPicker.SelectedItem is ComboBoxItem { Tag: string name } && name != model.SelectedModel) model.SelectedModel = name;
         };
         DockPanel.SetDock(modelPicker, Dock.Right);
         header.Children.Add(modelPicker);
+        // Interface language, next to the model so it is easy to find.
+        var language = Theme.FlatButton(Theme.GlyphGlobe, Loc.Current == UiLanguage.Es ? "Español" : "English", null,
+                                        "Idioma / Language", 12.5);
+        language.Margin = new Thickness(0, 0, 8, 0);
+        System.Windows.Automation.AutomationProperties.SetName(language, "Idioma / Language");
+        language.Click += (s, e) => LanguageMenu(language);
+        DockPanel.SetDock(language, Dock.Right);
+        header.Children.Add(language);
         headerTitle = new TextBlock { FontSize = 15, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
         header.Children.Add(headerTitle);
         chatArea.Children.Add(header);
@@ -263,6 +271,16 @@ internal sealed class MainWindow : Window
         Grid.SetRow(composerArea, 3);
         chatArea.Children.Add(composerArea);
         return chatArea;
+    }
+
+    private static void Detach(FrameworkElement element)
+    {
+        switch (element.Parent)
+        {
+            case Decorator d: d.Child = null; break;
+            case ContentControl c: c.Content = null; break;
+            case Panel p: p.Children.Remove(element); break;
+        }
     }
 
     /// <summary>Centers content in a column of at most <paramref name="width"/> pixels.</summary>
@@ -332,20 +350,6 @@ internal sealed class MainWindow : Window
 
         reasonButton = new Button { Template = Theme.FlatTemplate(13), Cursor = Cursors.Hand, Focusable = false, Padding = new Thickness(10, 4, 12, 4) };
         reasonButton.Click += (s, e) => model.Reason = !model.Reason;
-        reasonButton.ToolTip = tr("Más lento (unos 20 a 90 s) pero mucho más preciso en cuentas, conteos, lógica y fechas.",
-                                  "Slower (about 20 to 90 s) but much more accurate on math, counting, logic and dates.");
-        var translate = Theme.FlatButton(Theme.GlyphTranslate, tr("Traducir", "Translate"), null, null, 12.5);
-        translate.Click += (s, e) =>
-        {
-            var menu = new ContextMenu { PlacementTarget = translate, Placement = PlacementMode.Top };
-            var en = new MenuItem { Header = ChatModel.ToEnglish };
-            en.Click += (o, a) => { model.Translate(true); FocusComposerEnd(); };
-            var es = new MenuItem { Header = ChatModel.ToSpanish };
-            es.Click += (o, a) => { model.Translate(false); FocusComposerEnd(); };
-            menu.Items.Add(en);
-            menu.Items.Add(es);
-            menu.IsOpen = true;
-        };
         reasonHint = new TextBlock
         {
             Text = tr("Más lento (20 a 90 s), mucho más preciso en cuentas, conteos, lógica y fechas.",
@@ -361,7 +365,6 @@ internal sealed class MainWindow : Window
         tools.Children.Add(sendButton);
         var left = new StackPanel { Orientation = Orientation.Horizontal };
         left.Children.Add(reasonButton);
-        left.Children.Add(Spaced(translate, 6));
         DockPanel.SetDock(left, Dock.Left);
         tools.Children.Add(left);
         tools.Children.Add(reasonHint);
@@ -385,12 +388,6 @@ internal sealed class MainWindow : Window
         stack.Children.Add(status);
         stack.MaxWidth = 860;
         return new Border { Padding = new Thickness(24, 4, 24, 12), Child = stack };
-    }
-
-    private void FocusComposerEnd()
-    {
-        composer.Focus();
-        composer.CaretIndex = composer.Text.Length;
     }
 
     // Updates
@@ -470,12 +467,16 @@ internal sealed class MainWindow : Window
         updatingPicker = true;
         var items = model.Models.ToList();
         if (!items.Contains(model.SelectedModel)) items.Insert(0, model.SelectedModel);
-        if (!modelPicker.Items.Cast<string>().SequenceEqual(items))
+        // Models that cannot reason are marked, so the choice is clear before sending.
+        string Label(string name) =>
+            model.ReasoningModels.TryGetValue(name, out bool can) && !can ? name + tr("  (sin Razonar)", "  (no Reason)") : name;
+        var current = modelPicker.Items.Cast<ComboBoxItem>().Select(i => (string)i.Tag + "\n" + i.Content).ToList();
+        if (!current.SequenceEqual(items.Select(m => m + "\n" + Label(m))))
         {
             modelPicker.Items.Clear();
-            foreach (string m in items) modelPicker.Items.Add(m);
+            foreach (string m in items) modelPicker.Items.Add(new ComboBoxItem { Content = Label(m), Tag = m });
         }
-        modelPicker.SelectedItem = model.SelectedModel;
+        modelPicker.SelectedItem = modelPicker.Items.Cast<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == model.SelectedModel);
         updatingPicker = false;
     }
 
@@ -594,9 +595,17 @@ internal sealed class MainWindow : Window
         }
     }
 
+    private static string ReasonTip => tr("Más lento (unos 20 a 90 s) pero mucho más preciso en cuentas, conteos, lógica y fechas.",
+                                          "Slower (about 20 to 90 s) but much more accurate on math, counting, logic and dates.");
+
     private void RefreshComposerButtons()
     {
-        bool on = model.Reason;
+        bool on = model.Reason && model.CanReason;
+        reasonButton.IsEnabled = model.CanReason;
+        reasonButton.Opacity = model.CanReason ? 1 : 0.45;
+        reasonButton.ToolTip = model.CanReason ? ReasonTip
+            : tr($"{model.SelectedModel} no puede razonar: elige otro modelo para usar Razonar.",
+                 $"{model.SelectedModel} cannot reason: choose another model to use Reason.");
         reasonButton.Background = on ? Theme.Accent : Theme.CardHover;
         var fg = on ? Theme.OnAccent : Theme.Secondary;
         reasonButton.Content = new StackPanel
@@ -631,11 +640,14 @@ internal sealed class MainWindow : Window
     private string StatusText()
     {
         if (model.Reachable == null) return tr("Buscando Ollama…", "Looking for Ollama…");
+        string remote = Connection.RemoteHost;
         if (model.Reachable == false)
-            return tr("Ollama no responde en 127.0.0.1:11434. Ábrelo desde el menú Inicio o ejecuta: ollama serve",
-                      "Ollama is not reachable at 127.0.0.1:11434. Open it from the Start menu or run: ollama serve");
+            return remote != null ? OllamaException.NotReachable().Message
+                : tr("Ollama no responde en 127.0.0.1:11434. Ábrelo desde el menú Inicio o ejecuta: ollama serve",
+                     "Ollama is not reachable at 127.0.0.1:11434. Open it from the Start menu or run: ollama serve");
         int n = model.Models.Count;
-        var parts = new List<string> { tr("Ollama conectado", "Ollama connected") + $" · {n} " + (n == 1 ? tr("modelo", "model") : tr("modelos", "models")) };
+        string where = remote == null ? tr("Ollama conectado", "Ollama connected") : tr($"Ollama en {remote} (SSH)", $"Ollama on {remote} (SSH)");
+        var parts = new List<string> { where + $" · {n} " + (n == 1 ? tr("modelo", "model") : tr("modelos", "models")) };
         string name = model.SelectedModel;
         if (model.IsDraftingMemory)
         {
@@ -688,7 +700,7 @@ internal sealed class MainWindow : Window
     public void OpenSettings()
     {
         if (settingsWindow is { IsLoaded: true }) { settingsWindow.Activate(); return; }
-        settingsWindow = new SettingsWindow { Owner = this };
+        settingsWindow = new SettingsWindow { Owner = this, Model = model };
         settingsWindow.Show();
     }
 

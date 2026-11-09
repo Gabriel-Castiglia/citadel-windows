@@ -64,6 +64,10 @@ internal sealed class Settings
     public string Model { get; set; }
     public bool Reason { get; set; }
     public string MemoryFolder { get; set; }
+    /// <summary>True to reach Ollama on another computer through SSH (see Connection).</summary>
+    public bool UseSsh { get; set; }
+    /// <summary>SSH destination: user@host, or a Host name from ~/.ssh/config.</summary>
+    public string SshHost { get; set; }
     public double[] Window { get; set; }
 
     [JsonIgnore] public bool Persist = true;

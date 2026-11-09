@@ -30,6 +30,9 @@ internal sealed class SettingsWindow : Window
     private Button saveRules, revertRules;
     private bool rulesDirty;
 
+    /// <summary>The chat model, so a new Ollama connection can be tested at once.</summary>
+    public ChatModel Model { get; init; }
+
     public SettingsWindow()
     {
         Width = 720;
@@ -54,7 +57,7 @@ internal sealed class SettingsWindow : Window
         };
     }
 
-    /// <summary>Shows the given tab: 0 for Memories, 1 for Rules.</summary>
+    /// <summary>Shows the given tab: 0 for Memories, 1 for Rules, 2 for Ollama.</summary>
     public int Tab { set => tabs.SelectedIndex = value; }
 
     private void Build()
@@ -64,6 +67,7 @@ internal sealed class SettingsWindow : Window
         tabs = new TabControl { Margin = new Thickness(14, 10, 14, 14), Background = Brushes.Transparent, BorderThickness = new Thickness(0) };
         tabs.Items.Add(new TabItem { Header = tr("Memorias", "Memories"), Content = MemoriesTab() });
         tabs.Items.Add(new TabItem { Header = tr("Reglas", "Rules"), Content = RulesTab() });
+        tabs.Items.Add(new TabItem { Header = "Ollama", Content = OllamaTab() });
         tabs.SelectedIndex = selected;
         Content = tabs;
         ReloadMemories();
@@ -113,6 +117,61 @@ internal sealed class SettingsWindow : Window
             BorderBrush = Theme.Stroke, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(6),
             Child = new ScrollViewer { Content = memoryList, VerticalScrollBarVisibility = ScrollBarVisibility.Auto },
         });
+        return panel;
+    }
+
+    private UIElement OllamaTab()
+    {
+        var panel = new StackPanel { Margin = new Thickness(6, 14, 6, 6) };
+        panel.Children.Add(new TextBlock { Text = tr("Dónde corre Ollama", "Where Ollama runs"), FontWeight = FontWeights.SemiBold, FontSize = 13.5 });
+        var local = new RadioButton
+        {
+            Content = tr("En esta computadora (127.0.0.1:11434)", "On this computer (127.0.0.1:11434)"),
+            IsChecked = !Settings.Current.UseSsh, Margin = new Thickness(0, 10, 0, 0), GroupName = "where",
+        };
+        var remote = new RadioButton
+        {
+            Content = tr("En otra computadora, por SSH", "On another computer, through SSH"),
+            IsChecked = Settings.Current.UseSsh, Margin = new Thickness(0, 8, 0, 0), GroupName = "where",
+        };
+        var host = new TextBox
+        {
+            Text = Settings.Current.SshHost ?? "", FontFamily = Theme.Mono, FontSize = 12.5, Padding = new Thickness(6, 4, 6, 4),
+            Margin = new Thickness(26, 8, 0, 0), MaxWidth = 420, HorizontalAlignment = HorizontalAlignment.Left, MinWidth = 320,
+            ToolTip = tr("usuario@equipo, o un Host de ~/.ssh/config", "user@host, or a Host from ~/.ssh/config"),
+        };
+        host.IsEnabled = remote.IsChecked == true;
+        remote.Checked += (s, e) => host.IsEnabled = true;
+        local.Checked += (s, e) => host.IsEnabled = false;
+        panel.Children.Add(local);
+        panel.Children.Add(remote);
+        panel.Children.Add(host);
+        panel.Children.Add(new TextBlock
+        {
+            Text = tr("Citadel abre un túnel con el ssh de Windows hasta el puerto 11434 de esa computadora y lo cierra al salir. Usa tu llave SSH: nunca pide contraseña. El manual explica cómo preparar las dos computadoras.",
+                      "Citadel opens a tunnel with the Windows ssh command to port 11434 of that computer and closes it on exit. It uses your SSH key and never asks for a password. The manual explains how to prepare both computers."),
+            FontSize = 12, Foreground = Theme.Secondary, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 12, 0, 0),
+        });
+        var result = new TextBlock { FontSize = 12, Foreground = Theme.Secondary, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        var apply = new Button { Content = tr("Aplicar y probar", "Apply and test"), Padding = new Thickness(12, 4, 12, 4) };
+        apply.Click += async (s, e) =>
+        {
+            Settings.Current.UseSsh = remote.IsChecked == true && host.Text.Trim().Length > 0;
+            Settings.Current.SshHost = host.Text.Trim().Length > 0 ? host.Text.Trim() : null;
+            Settings.Current.Save();
+            Connection.Stop();
+            apply.IsEnabled = false;
+            result.Text = tr("Conectando…", "Connecting…");
+            try
+            {
+                var models = await Ollama.ListModels();
+                result.Text = tr($"Conectado: {models.Count} modelo(s). ", $"Connected: {models.Count} model(s). ") + string.Join(", ", models);
+            }
+            catch (Exception ex) { result.Text = ex.Message; }
+            finally { apply.IsEnabled = true; }
+            if (Model != null) await Model.RefreshStatus();
+        };
+        panel.Children.Add(new DockPanel { Margin = new Thickness(0, 14, 0, 0), Children = { apply, result } });
         return panel;
     }
 

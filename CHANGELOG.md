@@ -2,6 +2,30 @@
 
 All notable changes to Citadel for Windows. Versions follow [semantic versioning](https://semver.org): major.minor.patch.
 
+## 1.1.0 - 2026-11-09
+
+### Added
+
+- Ollama on another computer through SSH: Settings → Ollama opens a tunnel with the Windows `ssh`
+  command to port 11434 of that computer and closes it on exit.
+- Models that cannot reason are marked "(no Reason)" in the model list, and the Reason button is
+  dimmed while one of them is selected.
+
+### Changed
+
+- The language button moved from the bottom of the sidebar to the top right, next to the model list,
+  and shows the current language.
+
+### Fixed
+
+- The language button did nothing when clicked.
+- Changing the language from the main window could leave it half rebuilt, and the welcome text stayed
+  in the previous language.
+
+### Removed
+
+- The Translate menu.
+
 ## 1.0.0 - 2026-11-09
 
 First release.
