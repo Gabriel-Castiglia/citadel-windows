@@ -69,6 +69,10 @@ internal sealed class Settings
     /// <summary>SSH destination: user@host, or a Host name from ~/.ssh/config.</summary>
     public string SshHost { get; set; }
     public double[] Window { get; set; }
+    /// <summary>"auto" (as Windows), "light" or "dark" (the default).</summary>
+    public string Appearance { get; set; }
+    /// <summary>Key of the accent colour (Theme.Accents); green when unset.</summary>
+    public string Accent { get; set; }
 
     [JsonIgnore] public bool Persist = true;
 

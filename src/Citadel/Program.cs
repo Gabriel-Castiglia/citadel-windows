@@ -20,6 +20,9 @@ namespace Citadel;
 
 internal static class Program
 {
+    /// <summary>Settings tab shown by --screenshot --window settings (--tab N).</summary>
+    private static int shotTab = -1;
+
     /// <summary>Largest size of citadel.log before it is rotated to citadel.old.log.</summary>
     private const long MaxLogBytes = 512 * 1024;
 
@@ -31,8 +34,9 @@ internal static class Program
         //   --memory-folder <folder>   use this memory folder
         //   --language en|es           interface language for this run
         //   --self-test                run the main features against Ollama and print PASS/FAIL lines
-        //   --screenshot <file.png>    render a window to a PNG and exit; --window main|settings|about|save
-        string shot = null, window = "main", language = null;
+        //   --screenshot <file.png>    render a window to a PNG and exit; --window main|settings|about|save,
+        //                              --tab N (settings), --appearance auto|light|dark, --accent KEY
+        string shot = null, window = "main", language = null, appearance = null, accent = null;
         bool selfTest = false;
         for (int i = 0; i < args.Length; i++)
         {
@@ -44,6 +48,9 @@ internal static class Program
                 case "--language" when next != null: language = next; i++; break;
                 case "--screenshot" when next != null: shot = Path.GetFullPath(next); i++; break;
                 case "--window" when next != null: window = next; i++; break;
+                case "--appearance" when next != null: appearance = next; i++; break;
+                case "--accent" when next != null: accent = next; i++; break;
+                case "--tab" when next != null: shotTab = int.TryParse(next, out var t) ? t : -1; i++; break;
                 case "--self-test": selfTest = true; break;
             }
         }
@@ -62,6 +69,13 @@ internal static class Program
         Settings.Load();
         Settings.Current.Persist = !test;
         if (language != null) Loc.Current = Loc.FromCode(language);
+        if (shot != null && appearance != null) Settings.Current.Appearance = appearance;
+        if (shot != null && accent != null) Settings.Current.Accent = accent;
+        Theme.ApplyAppMode();
+        Microsoft.Win32.SystemEvents.UserPreferenceChanged += (s, e) =>
+        {
+            if (e.Category == Microsoft.Win32.UserPreferenceCategory.General) app.Dispatcher.BeginInvoke(Theme.SystemChanged);
+        };
 
         var model = new ChatModel { Persist = !test };
         model.Start(loadSaved: !selfTest);
@@ -98,7 +112,9 @@ internal static class Program
         switch (which)
         {
             case "settings":
-                target = new SettingsWindow { Owner = main, Model = model };
+                var settings = new SettingsWindow { Owner = main, Model = model };
+                if (shotTab >= 0) settings.Tab = shotTab;
+                target = settings;
                 target.Show();
                 break;
             case "about":

@@ -70,7 +70,7 @@ internal sealed class MainWindow : Window
         Background = Theme.Window;
         FontFamily = Theme.Ui;
         Foreground = Theme.Text;
-        Icon = BitmapFrame.Create(new Uri("pack://application:,,,/citadel.ico"));
+        Theme.Apply(this);
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         RestoreSavedBounds();
 
@@ -88,8 +88,9 @@ internal sealed class MainWindow : Window
         };
         toastTimer.Tick += (s, e) => { toastTimer.Stop(); toast.Visibility = Visibility.Collapsed; };
         Loc.Changed += Build;
+        Theme.Changed += Build;
         Closing += (s, e) => SaveBounds();
-        Closed += (s, e) => Loc.Changed -= Build;
+        Closed += (s, e) => { Loc.Changed -= Build; Theme.Changed -= Build; };
         PreviewKeyDown += OnKey;
         Build();
     }
@@ -121,6 +122,7 @@ internal sealed class MainWindow : Window
     {
         // These panels outlive a rebuild (language change): free them from the old layout first.
         foreach (var kept in new FrameworkElement[] { conversationList, messagesPanel, attachmentPanel }) Detach(kept);
+        Theme.Apply(this);
         answerViews.Clear();
         shownConversation = null;
         shownCount = -1;
@@ -131,7 +133,7 @@ internal sealed class MainWindow : Window
         root.ColumnDefinitions.Add(new ColumnDefinition());
         var sidebar = BuildSidebar();
         root.Children.Add(sidebar);
-        var line = new Border { Background = Brushes.Black, Opacity = 0.5 };
+        var line = new Border { Background = Theme.Divider, Opacity = Theme.Dark ? 0.5 : 1 };
         Grid.SetColumn(line, 1);
         root.Children.Add(line);
         var chat = BuildChat();
@@ -620,9 +622,9 @@ internal sealed class MainWindow : Window
         reasonHint.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
         bool busy = model.IsGenerating || model.IsDraftingMemory;
         sendButton.IsEnabled = busy || model.CanSend;
-        sendButton.Background = busy ? Brushes.WhiteSmoke : model.CanSend ? Theme.Accent : Theme.CardHover;
+        sendButton.Background = busy ? Theme.Text : model.CanSend ? Theme.Accent : Theme.CardHover;
         sendButton.Content = Theme.Icon(busy ? Theme.GlyphStop : Theme.GlyphSend, 13,
-                                        busy ? Brushes.Black : model.CanSend ? Theme.OnAccent : Theme.Secondary);
+                                        busy ? Theme.Window : model.CanSend ? Theme.OnAccent : Theme.Secondary);
         sendButton.ToolTip = busy ? tr("Detener (Esc)", "Stop (Esc)") : tr("Enviar (Enter) · Nueva línea (Shift+Enter)", "Send (Enter) · New line (Shift+Enter)");
     }
 

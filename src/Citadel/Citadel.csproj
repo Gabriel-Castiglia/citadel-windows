@@ -25,7 +25,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <!-- The single place where the version is set; scripts\build.ps1 and the installers read it from here. -->
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Product>Citadel</Product>
     <Description>Local AI chat for Windows</Description>
@@ -54,6 +54,7 @@
   <ItemGroup>
     <!-- Icon used by the windows and the About window. -->
     <Resource Include="citadel.ico" />
+    <Resource Include="accents\*.png" />
     <!-- The license travels next to the executable, outside the single-file bundle, so the About window can open it. -->
     <None Include="..\..\LICENSE" Link="LICENSE.txt" CopyToOutputDirectory="PreserveNewest"
           CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />

@@ -11,6 +11,8 @@
 //  It is distributed WITHOUT ANY WARRANTY. See the LICENSE file for details.
 //
 
+using System.Windows.Media;
+
 namespace Citadel;
 
 /// <summary>
@@ -64,6 +66,24 @@ internal static class SelfTest
         }
         Say("memory folder: " + folder);
         bool savedReason = Settings.Current.Reason;
+
+        // Theme: twelve colours with their icons; light and dark give different colours; a change is announced.
+        var (savedLook, savedAccent) = (Settings.Current.Appearance, Settings.Current.Accent);
+        int loaded = 0;
+        foreach (var acc in Theme.Accents) { try { if (Theme.AccentIcon(acc.Key).Width > 0) loaded++; } catch { } }
+        Check(Theme.Accents.Length == 12 && loaded == 12, $"twelve theme colours, each with its icon ({loaded})");
+        int changes = 0;
+        void count() => changes++;
+        Theme.Changed += count;
+        Theme.SetAppearance("light");
+        var lightWindow = ((SolidColorBrush)Theme.Window).Color;
+        Theme.SetAppearance("dark");
+        var darkWindow = ((SolidColorBrush)Theme.Window).Color;
+        Theme.SetAccent("purple");
+        Check(lightWindow.R > 200 && darkWindow.R < 60 && changes == 3, $"light and dark palettes, changes announced ({lightWindow} {darkWindow} {changes})");
+        Check(((SolidColorBrush)Theme.Accent).Color == Color.FromRgb(0xB3, 0x92, 0xE0), "the accent takes the chosen colour");
+        Theme.Changed -= count;
+        Settings.Current.Appearance = savedLook; Settings.Current.Accent = savedAccent;
 
         await m.RefreshStatus();
         Check(m.Reachable == true, "Ollama reachable");

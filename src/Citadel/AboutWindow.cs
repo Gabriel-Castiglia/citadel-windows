@@ -35,8 +35,7 @@ internal sealed class AboutWindow : Window
         ResizeMode = ResizeMode.NoResize;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ShowInTaskbar = false;
-        Background = Theme.Window;
-        Foreground = Theme.Text;
+        Theme.Apply(this);
         FontFamily = Theme.Ui;
         FontSize = 13;
         Build();

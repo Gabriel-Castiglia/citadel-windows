@@ -1,6 +1,6 @@
 # Citadel para Windows
 
-Gabriel Castiglia · 9 de noviembre de 2026 · versión 1.1.0 · licencia GPL-2.0
+Gabriel Castiglia · 10 de noviembre de 2026 · versión 1.2.0 · licencia GPL-2.0
 
 [English](README.md) · Español
 
@@ -12,7 +12,7 @@ Citadel es una app de chat para Windows 10 y 11 que conversa con modelos de leng
 misma computadora mediante [Ollama](https://ollama.com). Nada de lo que escribes sale de la computadora:
 la app solo se conecta con Ollama en `127.0.0.1:11434`, salvo que elijas usar el Ollama de otra
 computadora tuya por SSH (ver [Ollama en otra computadora](#ollama-en-otra-computadora)). Está escrita en C# con .NET 10 y WPF, usa el
-estilo oscuro de Windows 11 con tu color de énfasis y su interfaz está en inglés y en español. La
+estilo de Windows 11, oscuro, claro o como Windows, en uno de doce colores, y su interfaz está en inglés y en español. La
 versión para macOS, con las mismas funciones, tiene su propio repositorio:
 <https://github.com/Gabriel-Castiglia/citadel>.
 
@@ -224,6 +224,14 @@ recuerda. En el primer arranque Citadel usa el idioma elegido durante la instala
 corre sin instalar. El idioma de la interfaz no cambia el de las respuestas: el modelo contesta en el
 idioma en que le escribes.
 
+## Tema y color
+
+Ajustes → Apariencia elige cómo se ve la ventana: como Windows (clara u oscura, como tus otras apps),
+clara u oscura, que es la de fábrica. Debajo, doce colores cambian los botones, la selección y el
+resplandor detrás de la ciudadela en el ícono de la ventana y de la barra de tareas mientras Citadel está
+abierto; el verde es el original. Los accesos directos del menú Inicio y del escritorio conservan el ícono
+verde. La versión para Mac tiene las mismas opciones.
+
 ## Ollama en otra computadora
 
 Un modelo demasiado grande para esta computadora puede correr en otra computadora tuya, y Citadel puede
@@ -329,9 +337,9 @@ manuales en PDF y `README.txt` y `README.es.txt` a partir de `README.md` y de es
 
 ## Notas técnicas
 
-- Las ventanas usan el tema Fluent de WPF en modo oscuro (`Application.ThemeMode`), que .NET 10 todavía
-  marca como experimental (advertencia WPF0001, silenciada en el archivo del proyecto). El color de
-  énfasis es el que está configurado en Windows; si no hay ninguno, Citadel usa verde.
+- Las ventanas usan el tema Fluent de WPF (`Application.ThemeMode`), oscuro o claro según lo elegido, que
+  .NET 10 todavía marca como experimental (advertencia WPF0001, silenciada en el archivo del proyecto). El
+  color de énfasis es el que se elige en Ajustes → Apariencia (verde de fábrica).
 - Las respuestas se muestran en un cuadro de texto enriquecido de solo lectura con un documento de
   flujo, así una respuesta entera se puede seleccionar y copiar. Los bloques de código son recuadros
   incrustados con su propio botón Copiar.

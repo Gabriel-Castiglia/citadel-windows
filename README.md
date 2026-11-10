@@ -1,6 +1,6 @@
 # Citadel for Windows
 
-Gabriel Castiglia · November 9, 2026 · version 1.1.0 · GPL-2.0 license
+Gabriel Castiglia · November 10, 2026 · version 1.2.0 · GPL-2.0 license
 
 English · [Español](README.es.md)
 
@@ -11,8 +11,8 @@ PDF manual: [`docs/Citadel-manual-en.pdf`](docs/Citadel-manual-en.pdf)
 Citadel is a chat app for Windows 10 and 11 that talks to language models running on the same computer
 through [Ollama](https://ollama.com). Nothing you write leaves the computer: the app only connects to
 Ollama at `127.0.0.1:11434`, unless you choose to reach Ollama on another computer of yours through
-SSH (see [Ollama on another computer](#ollama-on-another-computer)). It is written in C# with .NET 10 and WPF, uses the dark Windows 11 style
-with your accent color, and its interface is in English and Spanish. A macOS version with the same
+SSH (see [Ollama on another computer](#ollama-on-another-computer)). It is written in C# with .NET 10 and WPF, uses the Windows 11 style, dark,
+light or as Windows, in one of twelve colours, and its interface is in English and Spanish. A macOS version with the same
 features lives in its own repository, <https://github.com/Gabriel-Castiglia/citadel>.
 
 Citadel is a chat window, not an agent. The model cannot open files, run commands or browse the web.
@@ -219,6 +219,13 @@ remembered. On its first start Citadel uses the language chosen during setup, or
 without installation. The language of the interface does not change the language of the answers: the
 model answers in the language you write in.
 
+## Theme and colour
+
+Settings → Appearance chooses the look of the window: as Windows (light or dark, like your other apps),
+light or dark, which is the default. Below it, twelve colours change the buttons, the selection and the
+glow behind the citadel in the icon of the window and the taskbar while Citadel is open; green is the
+original. The Start menu and desktop shortcuts keep the green icon. The Mac version has the same choices.
+
 ## Ollama on another computer
 
 A model too big for this computer can run on another computer of yours, and Citadel can use it through
@@ -322,9 +329,9 @@ manuals and `README.txt` and `README.es.txt` from this file and `README.es.md`, 
 
 ## Technical notes
 
-- The windows use WPF's Fluent theme in dark mode (`Application.ThemeMode`), which .NET 10 still marks
-  as experimental (warning WPF0001, silenced in the project file). The accent color is the one set in
-  Windows; when there is none, Citadel uses green.
+- The windows use WPF's Fluent theme (`Application.ThemeMode`), dark or light as chosen, which .NET 10
+  still marks as experimental (warning WPF0001, silenced in the project file). The accent color is the
+  one chosen in Settings → Appearance (green by default).
 - Answers are shown in a read-only rich text box holding a flow document, so a whole answer can be
   selected and copied. Code blocks are embedded boxes with their own Copy button.
 - Answers arrive from `/api/chat` as one JSON object per line. Stop cancels the request, which closes

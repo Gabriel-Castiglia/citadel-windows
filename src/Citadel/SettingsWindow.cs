@@ -46,7 +46,8 @@ internal sealed class SettingsWindow : Window
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Build();
         Loc.Changed += Build;
-        Closed += (s, e) => Loc.Changed -= Build;
+        Theme.Changed += Build;
+        Closed += (s, e) => { Loc.Changed -= Build; Theme.Changed -= Build; };
         PreviewKeyDown += (s, e) =>
         {
             if (e.Key == System.Windows.Input.Key.S && (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) != 0 && rulesDirty)
@@ -57,17 +58,19 @@ internal sealed class SettingsWindow : Window
         };
     }
 
-    /// <summary>Shows the given tab: 0 for Memories, 1 for Rules, 2 for Ollama.</summary>
+    /// <summary>Shows the given tab: 0 for Memories, 1 for Rules, 2 for Ollama, 3 for Appearance.</summary>
     public int Tab { set => tabs.SelectedIndex = value; }
 
     private void Build()
     {
         Title = tr("Ajustes de Citadel", "Citadel Settings");
+        Theme.Apply(this);
         int selected = tabs?.SelectedIndex ?? 0;
         tabs = new TabControl { Margin = new Thickness(14, 10, 14, 14), Background = Brushes.Transparent, BorderThickness = new Thickness(0) };
         tabs.Items.Add(new TabItem { Header = tr("Memorias", "Memories"), Content = MemoriesTab() });
         tabs.Items.Add(new TabItem { Header = tr("Reglas", "Rules"), Content = RulesTab() });
         tabs.Items.Add(new TabItem { Header = "Ollama", Content = OllamaTab() });
+        tabs.Items.Add(new TabItem { Header = tr("Apariencia", "Appearance"), Content = AppearanceTab() });
         tabs.SelectedIndex = selected;
         Content = tabs;
         ReloadMemories();
@@ -118,6 +121,56 @@ internal sealed class SettingsWindow : Window
             Child = new ScrollViewer { Content = memoryList, VerticalScrollBarVisibility = ScrollBarVisibility.Auto },
         });
         return panel;
+    }
+
+    /// <summary>Appearance (as Windows, light, dark) and the twelve accent colours (Theme.Accents).</summary>
+    private UIElement AppearanceTab()
+    {
+        var panel = new StackPanel { Margin = new Thickness(6, 14, 6, 6) };
+        panel.Children.Add(new TextBlock { Text = tr("Apariencia", "Appearance"), FontWeight = FontWeights.SemiBold, FontSize = 13.5 });
+        var looks = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
+        foreach (var (key, label) in new[] { ("auto", tr("Como Windows", "As Windows")), ("light", tr("Claro", "Light")), ("dark", tr("Oscuro", "Dark")) })
+        {
+            bool on = (Settings.Current.Appearance ?? "dark") == key;
+            var b = new Button
+            {
+                Content = new TextBlock { Text = label, FontSize = 13, Foreground = on ? Theme.OnAccent : Theme.Text },
+                Background = on ? Theme.Accent : Theme.Card, Template = Theme.FlatTemplate(6),
+                Padding = new Thickness(14, 6, 14, 6), Margin = new Thickness(0, 0, 6, 0), Cursor = System.Windows.Input.Cursors.Hand,
+            };
+            b.Click += (s, e) => Theme.SetAppearance(key);
+            looks.Children.Add(b);
+        }
+        panel.Children.Add(looks);
+        panel.Children.Add(new TextBlock
+        {
+            Text = tr("Color de los botones y del ícono", "Colour of the buttons and the icon"),
+            FontWeight = FontWeights.SemiBold, FontSize = 13.5, Margin = new Thickness(0, 18, 0, 0),
+        });
+        var grid = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
+        foreach (var a in Theme.Accents)
+        {
+            bool on = Theme.CurrentAccent.Key == a.Key;
+            var cell = new StackPanel { Width = 84 };
+            cell.Children.Add(new Image { Source = Theme.AccentIcon(a.Key), Width = 52, Height = 52 });
+            cell.Children.Add(new TextBlock { Text = a.Name, FontSize = 11.5, TextAlignment = TextAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 4, 0, 0) });
+            var b = new Button
+            {
+                Content = cell, Template = Theme.FlatTemplate(8), Padding = new Thickness(4), Margin = new Thickness(0, 0, 6, 8),
+                Background = on ? Theme.AccentSoft : Brushes.Transparent, BorderBrush = Theme.Accent,
+                Cursor = System.Windows.Input.Cursors.Hand, ToolTip = a.Name,
+            };
+            b.Click += (s, e) => Theme.SetAccent(a.Key);
+            grid.Children.Add(b);
+        }
+        panel.Children.Add(grid);
+        panel.Children.Add(new TextBlock
+        {
+            Text = tr("El color se usa en los botones, la selección y el ícono de la ventana y de la barra de tareas mientras Citadel está abierto. El acceso directo conserva el ícono verde.",
+                      "The colour is used for the buttons, the selection and the icon of the window and the taskbar while Citadel is open. The shortcut keeps the green icon."),
+            FontSize = 12, Foreground = Theme.Secondary, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 0),
+        });
+        return new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
     }
 
     private UIElement OllamaTab()

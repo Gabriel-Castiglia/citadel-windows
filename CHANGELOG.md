@@ -2,6 +2,15 @@
 
 All notable changes to Citadel for Windows. Versions follow [semantic versioning](https://semver.org): major.minor.patch.
 
+## 1.2.0 - 2026-11-10
+
+### Added
+
+- Theme and colour, as in Wyrmhold and Gryphmark: Settings → Appearance chooses as Windows, light or dark (the
+  default), and one of twelve colours for the buttons, the selection and the icon of the window and the taskbar
+  (green is the original). The standard controls and the title bar follow the appearance, and "as Windows"
+  follows a change in Windows at once. The accent no longer comes from the Windows accent colour.
+
 ## 1.1.0 - 2026-11-09
 
 ### Added
