@@ -27,6 +27,8 @@ internal enum SetupState { Install, Upgrade, Maintenance, Uninstall, Newer }
 /// Bootstrapper application: talks to the WiX engine (detect, plan, apply) and drives the setup window.
 /// The engine calls back on its own thread; everything that touches the window goes through the dispatcher.
 /// Without a full user interface (/quiet, /passive, or an upgrade removing this version) it works on its own.
+/// Citadel's own updates run it as "citadel-setup.exe /quiet /norestart /CITADELWAITPID=&lt;pid&gt; /CITADELRELAUNCH=1":
+/// it waits for that Citadel to finish closing before anything is replaced, and opens Citadel again at the end.
 /// </summary>
 internal sealed class SetupApplication : BootstrapperApplication
 {
@@ -51,6 +53,10 @@ internal sealed class SetupApplication : BootstrapperApplication
     private SetupWindow window;
     private IntPtr windowHandle;
     private int exitCode;
+    /// <summary>/CITADELWAITPID=&lt;pid&gt;: the Citadel that started this update, closing by itself.</summary>
+    private int waitPid;
+    /// <summary>/CITADELRELAUNCH=1: open Citadel again when the setup ends.</summary>
+    private bool relaunch;
 
     protected override void OnCreate(CreateEventArgs args)
     {
@@ -63,6 +69,7 @@ internal sealed class SetupApplication : BootstrapperApplication
         dispatcher = Dispatcher.CurrentDispatcher;
         Version = engine.GetVariableVersion("WixBundleVersion");
         Loc.Current = InitialLanguage();
+        ReadUpdateArguments();
 
         DetectRelatedBundle += OnDetectRelatedBundle;
         DetectPackageComplete += OnDetectPackageComplete;
@@ -145,6 +152,7 @@ internal sealed class SetupApplication : BootstrapperApplication
         // Closing Citadel can take a few seconds: it is done off the window's thread.
         System.Threading.Tasks.Task.Run(() =>
         {
+            WaitForUpdatingCitadel();
             CloseRunningCitadel();
             try { engine.Plan(action); }
             catch (Exception ex)
@@ -154,6 +162,61 @@ internal sealed class SetupApplication : BootstrapperApplication
                 Finish(ex.HResult < 0 ? ex.HResult : unchecked((int)0x80004005));
             }
         });
+    }
+
+    // ---------------- Updates started by Citadel ----------------
+    /// <summary>Reads /CITADELWAITPID=&lt;pid&gt; and /CITADELRELAUNCH=1 (the engine passes on what it does not know).</summary>
+    private void ReadUpdateArguments()
+    {
+        string[] args;
+        try { args = Command.ParseCommandLine().UnknownCommandLineArgs ?? new string[0]; }
+        catch { args = new string[0]; }
+        foreach (string raw in args)
+        {
+            string a = raw.TrimStart('/', '-');
+            int eq = a.IndexOf('=');
+            string name = (eq < 0 ? a : a.Substring(0, eq)).ToUpperInvariant(), value = eq < 0 ? "" : a.Substring(eq + 1);
+            if (name == "CITADELWAITPID" && int.TryParse(value, out int pid) && pid > 0) waitPid = pid;
+            else if (name == "CITADELRELAUNCH") relaunch = value == "1";
+        }
+        if (waitPid > 0 || relaunch) engine.Log(LogLevel.Standard, $"Citadel setup: update started by Citadel (wait for {waitPid}, relaunch {relaunch}).");
+    }
+
+    /// <summary>
+    /// Waits for the Citadel that started the update to close by itself (it first saves its conversations and
+    /// asks about an answer in progress), for up to two minutes; CloseRunningCitadel deals with what is left.
+    /// </summary>
+    private void WaitForUpdatingCitadel()
+    {
+        if (waitPid <= 0) return;
+        try
+        {
+            using (var p = Process.GetProcessById(waitPid))
+            {
+                if (!string.Equals(p.ProcessName, "Citadel", StringComparison.OrdinalIgnoreCase)) return;
+                bool closed = p.WaitForExit(120000);
+                engine.Log(LogLevel.Standard, closed ? "Citadel setup: the updating Citadel has closed." : "Citadel setup: the updating Citadel is still open after 2 minutes.");
+            }
+        }
+        catch (ArgumentException) { }   // already gone
+        catch (Exception ex) { engine.Log(LogLevel.Standard, "Citadel setup: could not wait for Citadel: " + ex.Message); }
+    }
+
+    /// <summary>
+    /// Opens Citadel again after an update, whether it went well or not (a failed or declined update leaves the
+    /// previous version installed). This process runs without elevation, so Citadel opens as the user.
+    /// </summary>
+    private void RelaunchCitadel(bool updated)
+    {
+        relaunch = false;
+        try
+        {
+            string exe = Path.Combine(InstallFolder, "Citadel.exe");
+            if (!File.Exists(exe)) { engine.Log(LogLevel.Standard, "Citadel setup: nothing to open again at " + exe); return; }
+            Process.Start(new ProcessStartInfo(exe, updated ? "--updated" : "") { UseShellExecute = false, WorkingDirectory = InstallFolder });
+            engine.Log(LogLevel.Standard, "Citadel setup: opened Citadel again.");
+        }
+        catch (Exception ex) { engine.Log(LogLevel.Standard, "Citadel setup: could not open Citadel again: " + ex.Message); }
     }
 
     // ---------------- Closing a running Citadel ----------------
@@ -234,6 +297,7 @@ internal sealed class SetupApplication : BootstrapperApplication
     private void Finish(int status, bool restart = false)
     {
         exitCode = status;
+        if (relaunch) RelaunchCitadel(status >= 0);
         bool canceled = Canceled || status == UserCanceled;
         if (!Interactive)
         {

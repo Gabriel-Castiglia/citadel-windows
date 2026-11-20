@@ -14,6 +14,7 @@
 #   LICENSE.txt       the license, next to the executable
 #   citadel.msi        MSI package (silent install: msiexec /i citadel.msi /qn)
 #   citadel-setup.exe  setup program in English and Spanish that contains the MSI
+#   SHA256SUMS.txt     hashes of the three programs; Citadel's updates check the downloaded setup against it
 # Requires the .NET 10 SDK; the WiX Toolset is restored automatically as a NuGet package.
 # The version is read from src\Citadel\Citadel.csproj, the only place where it is set.
 
@@ -47,4 +48,10 @@ if ($LASTEXITCODE) { throw 'Setup .exe build failed.' }
 
 # 4) The stand-alone executable and its license, next to the installers.
 Copy-Item (Join-Path $publish 'Citadel.exe'), (Join-Path $publish 'LICENSE.txt') $dist
+
+# 5) Their hashes, in the format of sha256sum ("hash  name", LF line endings), to publish with the release.
+$sums = foreach ($name in 'citadel-setup.exe', 'citadel.msi', 'Citadel.exe') {
+    (Get-FileHash (Join-Path $dist $name) -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $name
+}
+[IO.File]::WriteAllText((Join-Path $dist 'SHA256SUMS.txt'), (($sums -join "`n") + "`n"))
 Get-ChildItem $dist -Include *.exe, *.msi, *.txt -Recurse | Select-Object Name, Length

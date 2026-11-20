@@ -73,6 +73,8 @@ internal sealed class Settings
     public string Appearance { get; set; }
     /// <summary>Key of the accent colour (Theme.Accents); green when unset.</summary>
     public string Accent { get; set; }
+    /// <summary>Open a conversation exported to Markdown with the app Windows uses for .md files.</summary>
+    public bool OpenAfterExport { get; set; }
 
     [JsonIgnore] public bool Persist = true;
 

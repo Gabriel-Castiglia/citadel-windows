@@ -1,6 +1,6 @@
 # Citadel para Windows
 
-Gabriel Castiglia · 10 de noviembre de 2026 · versión 1.2.0 · licencia GPL-2.0
+Gabriel Castiglia · 20 de noviembre de 2026 · versión 1.3.0 · licencia GPL-2.0
 
 [English](README.md) · Español
 
@@ -11,7 +11,7 @@ Manual en PDF: [`docs/Citadel-manual-es.pdf`](docs/Citadel-manual-es.pdf)
 Citadel es una app de chat para Windows 10 y 11 que conversa con modelos de lenguaje que corren en la
 misma computadora mediante [Ollama](https://ollama.com). Nada de lo que escribes sale de la computadora:
 la app solo se conecta con Ollama en `127.0.0.1:11434`, salvo que elijas usar el Ollama de otra
-computadora tuya por SSH (ver [Ollama en otra computadora](#ollama-en-otra-computadora)). Está escrita en C# con .NET 10 y WPF, usa el
+computadora tuya por SSH (ver [Ollama en otra computadora](#ollama-en-otra-computadora)); la única otra conexión es la búsqueda diaria de una versión nueva en GitHub (ver [Actualizaciones](#actualizaciones)), que no envía nada tuyo. Está escrita en C# con .NET 10 y WPF, usa el
 estilo de Windows 11, oscuro, claro o como Windows, en uno de doce colores, y su interfaz está en inglés y en español. La
 versión para macOS, con las mismas funciones, tiene su propio repositorio:
 <https://github.com/Gabriel-Castiglia/citadel>.
@@ -69,6 +69,20 @@ Ejecutar un `citadel-setup.exe` más nuevo actualiza el Citadel instalado y cons
 las memorias y los ajustes de cada usuario. Si Citadel está abierto, la instalación lo cierra antes de
 reemplazar sus archivos. Una versión más vieja no se puede instalar encima de una más nueva.
 
+### Actualizaciones
+
+Un Citadel instalado busca una versión nueva una vez por día, y Acerca de → Buscar actualizaciones busca
+en el momento. Si la hay, hace una sola pregunta: Actualizar ahora, Ver novedades (abre la página de la
+versión) o Más tarde. Actualizar ahora hace el resto solo: descarga `citadel-setup.exe` de la versión, lo
+comprueba con el `SHA256SUMS.txt` de la versión (un archivo que no coincide se borra y nunca se ejecuta),
+cierra Citadel, instala la versión nueva en silencio con el idioma elegido al instalar Citadel y vuelve a
+abrirlo. Windows pide permisos de administrador, como en cualquier instalación. Si se está escribiendo
+una respuesta, Citadel primero pregunta si esperarla o detenerla, así queda guardada en su conversación;
+el texto que se estaba escribiendo, sus adjuntos y la conversación abierta vuelven después del reinicio.
+Si la instalación falla o se rechaza, se vuelve a abrir la versión anterior.
+
+El `Citadel.exe` independiente no puede actualizarse solo: solo ofrece la página de la versión.
+
 Los archivos no están firmados con un certificado comercial, así que la primera vez Windows SmartScreen
 puede mostrar «Windows protegió su PC». «Más información» → «Ejecutar de todas formas» los abre.
 
@@ -100,8 +114,26 @@ tardó.
 
 La barra lateral lista las conversaciones, de la más nueva a la más vieja. Ctrl+N o el botón del lápiz
 empiezan una nueva, cuyo título es la primera línea del primer mensaje. Con clic derecho sobre una
-conversación se la renombra o se la elimina; eliminar pide confirmación y borra su archivo del disco. El
-campo de búsqueda filtra por título sin distinguir mayúsculas ni tildes.
+conversación se la renombra o se la elimina; eliminar pide confirmación y borra su archivo del disco.
+
+### Búsqueda
+
+El campo de búsqueda (Ctrl+F) busca en todas las conversaciones guardadas, sin distinguir mayúsculas,
+tildes ni saltos de línea. Primero aparecen las conversaciones cuyo título coincide; debajo, en «En los
+mensajes», cada mensaje que contiene el texto (lo que escribiste o una respuesta) aparece con su
+conversación, su fecha y las palabras alrededor de la coincidencia, resaltada. Un clic en un resultado
+abre esa conversación en ese mensaje.
+
+![Resultados de la búsqueda en los mensajes](docs/images/search-es.png)
+
+### Exportar a Markdown
+
+El botón de exportar del encabezado, junto al idioma, guarda la conversación que se ve como un archivo
+`.md`; con clic derecho sobre una conversación de la barra lateral se exporta esa. El archivo tiene el
+título, la fecha, el modelo y cada turno bajo un encabezado «Usuario» o «Asistente»; las respuestas
+conservan su Markdown y sus bloques de código intactos, y los adjuntos y el razonamiento van en bloques
+plegados. Con «Abrir después de exportar» marcado en el mismo menú, el archivo se abre con la aplicación
+que Windows usa para los `.md`.
 
 ### Modelos
 
@@ -277,6 +309,7 @@ siguiente.
 | Enter | Enviar |
 | Shift+Enter, Alt+Enter | Línea nueva |
 | Ctrl+N | Conversación nueva |
+| Ctrl+F | Buscar en las conversaciones |
 | Esc | Detener la respuesta |
 | Ctrl+, | Ajustes |
 | Ctrl+S | Guardar las reglas (pestaña Reglas) |
@@ -291,6 +324,8 @@ siguiente.
 | Memorias (carpeta por defecto) | `%APPDATA%\Citadel\memories\`, con `_index.md` |
 | Ajustes (idioma, modelo, Razonar, carpeta de memorias, destino SSH, posición de la ventana) | `%APPDATA%\Citadel\settings.json` |
 | Registro de errores, si algo falla | `%APPDATA%\Citadel\citadel.log`, de menos de 512 KB |
+| Fecha de la última búsqueda de actualizaciones | `%APPDATA%\Citadel\update-check.txt` |
+| Actualización descargada (mientras se instala) | `%TEMP%\CitadelUpdate\` |
 
 Los archivos se escriben en UTF-8 sin marca de orden de bytes. Las conversaciones son JSON simple con el
 mismo formato que la versión para macOS, así que se pueden copiar de una a otra.
@@ -305,7 +340,8 @@ powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 ```
 
 El primer comando compila el programa. El segundo genera todo en `dist`: el `Citadel.exe` independiente,
-`citadel.msi` y `citadel-setup.exe`; el WiX Toolset 5 se descarga solo como paquete de NuGet. La versión
+`citadel.msi`, `citadel-setup.exe` y `SHA256SUMS.txt`, que se publica con ellos para que las
+actualizaciones comprueben el instalador; el WiX Toolset 5 se descarga solo como paquete de NuGet. La versión
 se fija en un solo lugar, `src\Citadel\Citadel.csproj`, y los instaladores y la ventana Acerca de la leen
 de ahí.
 
@@ -315,10 +351,18 @@ carpeta en lugar de `%APPDATA%\Citadel`, así nunca tocan las conversaciones rea
 - `Citadel.exe --self-test --memory-folder <carpeta vacía>` prueba de punta a punta las funciones
   principales contra Ollama e imprime una línea PASS o FAIL por cada control: la lista de modelos, una
   respuesta sin Razonar y otra con Razonar, Detener, `/save` (archivo, línea del índice, sin marca de
-  orden de bytes) y `/mem`. Se niega a correr sobre una carpeta de memorias en uso. Su salida se lee
-  con `Start-Process Citadel.exe -ArgumentList ... -Wait -NoNewWindow -RedirectStandardOutput out.txt`.
+  orden de bytes) y `/mem`. Se niega a correr sobre una carpeta de memorias en uso. Antes, y sin Ollama,
+  comprueba la búsqueda, la exportación a Markdown (contra el archivo esperado) y las comprobaciones de
+  las actualizaciones (comparación de versiones, `SHA256SUMS.txt`, la respuesta de la versión, una
+  descarga que no coincide), con conversaciones inventadas en una carpeta temporal;
+  `--self-test --offline` corre solo estas. Su salida se lee con `Start-Process Citadel.exe -ArgumentList ... -Wait -NoNewWindow -RedirectStandardOutput out.txt`.
 - `Citadel.exe --screenshot <archivo.png> --window main|settings|about|save --language en|es` dibuja una
-  ventana en una imagen y se cierra.
+  ventana en una imagen y se cierra; `--search <texto>` muestra la barra lateral con los resultados de
+  una búsqueda.
+
+`citadel-setup.exe /quiet /norestart /CITADELWAITPID=<pid> /CITADELRELAUNCH=1` es como una actualización
+ejecuta la instalación: espera a que ese proceso de Citadel se cierre antes de reemplazar nada y vuelve a
+abrir Citadel al terminar.
 
 `scripts\screenshots.ps1 -Demo <carpeta>` genera las imágenes de `docs\images` con conversaciones y
 memorias de demostración, `scripts/manual.sh` (en macOS, con pandoc y Google Chrome) genera los

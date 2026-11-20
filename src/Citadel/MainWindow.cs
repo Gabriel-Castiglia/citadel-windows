@@ -24,7 +24,7 @@ using static Citadel.Loc;
 namespace Citadel;
 
 /// <summary>The main window: conversations on the left, the chat on the right.</summary>
-internal sealed class MainWindow : Window
+internal sealed partial class MainWindow : Window
 {
     private readonly ChatModel model;
 
@@ -59,6 +59,13 @@ internal sealed class MainWindow : Window
     private readonly DispatcherTimer streamTimer = new() { Interval = TimeSpan.FromMilliseconds(90) };
     private readonly HashSet<ChatMessage> dirtyAnswers = [];
 
+    // Search in the text of the conversations: waits for a pause in typing and keeps its last results.
+    private readonly DispatcherTimer searchTimer = new() { Interval = TimeSpan.FromMilliseconds(220) };
+    private string hitsKey;
+    private List<SearchHit> hits = [];
+    /// <summary>The view of each message shown, to scroll to a search result.</summary>
+    private readonly Dictionary<Guid, FrameworkElement> messageViews = [];
+
     public MainWindow(ChatModel model)
     {
         this.model = model;
@@ -92,6 +99,8 @@ internal sealed class MainWindow : Window
         Closing += (s, e) => SaveBounds();
         Closed += (s, e) => { Loc.Changed -= Build; Theme.Changed -= Build; };
         PreviewKeyDown += OnKey;
+        searchTimer.Tick += (s, e) => { searchTimer.Stop(); RefreshSidebar(); };
+        InitUpdate();
         Build();
     }
 
@@ -166,7 +175,9 @@ internal sealed class MainWindow : Window
         {
             searchHint.Visibility = searchBox.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
             model.Search = searchBox.Text;
-            RefreshSidebar();
+            // The titles and the text of every conversation are searched once typing pauses.
+            searchTimer.Stop();
+            searchTimer.Start();
         };
         searchHint.Visibility = searchBox.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
         var searchGrid = new Grid();
@@ -249,6 +260,19 @@ internal sealed class MainWindow : Window
         language.Click += (s, e) => LanguageMenu(language);
         DockPanel.SetDock(language, Dock.Right);
         header.Children.Add(language);
+        // Export the conversation shown to a Markdown file.
+        var export = Theme.FlatButton(Theme.GlyphExport, null, null, tr("Exportar a Markdown", "Export to Markdown"), 13);
+        export.Margin = new Thickness(0, 0, 4, 0);
+        System.Windows.Automation.AutomationProperties.SetName(export, tr("Exportar a Markdown", "Export to Markdown"));
+        export.Click += (s, e) =>
+        {
+            var menu = new ContextMenu { PlacementTarget = export, Placement = PlacementMode.Bottom };
+            AddExportItems(menu, () => model.Current);
+            ((MenuItem)menu.Items[0]).IsEnabled = model.Current is { Messages.Count: > 0 };
+            menu.IsOpen = true;
+        };
+        DockPanel.SetDock(export, Dock.Right);
+        header.Children.Add(export);
         headerTitle = new TextBlock { FontSize = 15, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
         header.Children.Add(headerTitle);
         chatArea.Children.Add(header);
@@ -415,8 +439,127 @@ internal sealed class MainWindow : Window
         conversationList.Children.Clear();
         var list = model.Filtered.ToList();
         foreach (var c in list) conversationList.Children.Add(ConversationRow(c));
-        if (list.Count == 0 && model.Search.Length > 0)
+
+        // The text of every saved conversation: one row per message that contains the search.
+        var found = SearchHits();
+        if (found.Count > 0)
+        {
+            conversationList.Children.Add(new TextBlock
+            {
+                Text = tr("En los mensajes", "In the messages") + $" ({found.Count}{(found.Count >= MaxHits ? "+" : "")})",
+                FontSize = 11.5, FontWeight = FontWeights.SemiBold, Foreground = Theme.Secondary, Margin = new Thickness(10, list.Count > 0 ? 12 : 2, 0, 6),
+            });
+            foreach (var h in found) conversationList.Children.Add(HitRow(h));
+        }
+        if (list.Count == 0 && found.Count == 0 && model.Search.Trim().Length > 0)
             conversationList.Children.Add(new TextBlock { Text = tr("Sin resultados", "No results"), FontSize = 12, Foreground = Theme.Secondary, Margin = new Thickness(12) });
+    }
+
+    private const int MaxHits = 200;
+
+    /// <summary>Puts a search in the sidebar and shows its results at once (screenshots).</summary>
+    public void ShowSearch(string text)
+    {
+        searchBox.Text = text;
+        searchTimer.Stop();
+        RefreshSidebar();
+    }
+
+    /// <summary>The search results in the messages, searched again only when the query or the conversations change.</summary>
+    private List<SearchHit> SearchHits()
+    {
+        string q = model.Search.Trim();
+        if (ConversationSearch.FoldQuery(q).Length < ConversationSearch.MinLength) { hitsKey = null; hits = []; return hits; }
+        string key = $"{q}\n{model.Conversations.Count}\n{model.Conversations.Sum(c => c.Messages.Count)}\n{model.Conversations.Sum(c => c.Messages.Sum(m => m.Content.Length))}";
+        if (key != hitsKey)
+        {
+            hits = ConversationSearch.Find(model.Conversations.Where(c => c.Messages.Count > 0), q, 5, MaxHits);
+            hitsKey = key;
+        }
+        return hits;
+    }
+
+    private static string ShortDate(DateTime utc) =>
+        utc.ToLocalTime().ToString(Loc.Current == UiLanguage.Es ? "d MMM yyyy, HH:mm" : "MMM d yyyy, HH:mm",
+                                   System.Globalization.CultureInfo.GetCultureInfo(Loc.Current == UiLanguage.Es ? "es-ES" : "en-US"));
+
+    /// <summary>A search result: the conversation, the date of the message and the text around the match, highlighted.</summary>
+    private UIElement HitRow(SearchHit h)
+    {
+        var text = new StackPanel();
+        text.Children.Add(new TextBlock { Text = h.Conversation.DisplayTitle, FontSize = 12.5, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis, Foreground = Theme.Text });
+        string who = h.Message.Role == Role.User ? tr("Tú", "You") : tr("Respuesta", "Answer");
+        text.Children.Add(new TextBlock { Text = $"{who} · {ShortDate(h.Message.Date)}", FontSize = 11, Foreground = Theme.Secondary, Margin = new Thickness(0, 1, 0, 2) });
+        var fragment = new TextBlock { FontSize = 12, Foreground = Theme.Secondary, TextWrapping = TextWrapping.Wrap, MaxHeight = 50, TextTrimming = TextTrimming.CharacterEllipsis };
+        fragment.Inlines.Add(new System.Windows.Documents.Run(h.Before));
+        fragment.Inlines.Add(new System.Windows.Documents.Run(h.Match) { FontWeight = FontWeights.SemiBold, Foreground = Theme.Text, Background = Theme.AccentSoft });
+        fragment.Inlines.Add(new System.Windows.Documents.Run(h.After));
+        text.Children.Add(fragment);
+        var row = new Border
+        {
+            CornerRadius = new CornerRadius(8), Padding = new Thickness(10, 6, 10, 7), Margin = new Thickness(0, 0, 0, 2),
+            Background = Brushes.Transparent, Child = text, Cursor = Cursors.Hand,
+            ToolTip = tr("Abrir la conversación en este mensaje", "Open the conversation at this message"),
+        };
+        row.MouseEnter += (s, e) => row.Background = Theme.Card;
+        row.MouseLeave += (s, e) => row.Background = Brushes.Transparent;
+        row.MouseLeftButtonUp += (s, e) => GoToMessage(h.Conversation.Id, h.Message.Id);
+        return row;
+    }
+
+    /// <summary>Opens a conversation and scrolls to one of its messages, which blinks once.</summary>
+    private void GoToMessage(Guid conversation, Guid message)
+    {
+        model.Select(conversation);
+        // After the messages are rebuilt and the scroll to the end they ask for.
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (!messageViews.TryGetValue(message, out var view) || messagesScroll.Content is not UIElement content) return;
+            double y = view.TranslatePoint(new Point(0, 0), content).Y;
+            messagesScroll.ScrollToVerticalOffset(Math.Max(0, y - 16));
+            view.BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(0.25, 1, TimeSpan.FromMilliseconds(900)));
+        }), DispatcherPriority.ContextIdle);
+    }
+
+    // Export
+
+    /// <summary>Saves a conversation as a Markdown file, and opens it after when that option is on.</summary>
+    private void ExportMarkdown(Conversation c)
+    {
+        if (c == null || c.Messages.Count == 0) { ShowToast(tr("Esta conversación todavía está vacía.", "This conversation is still empty.")); return; }
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = tr("Exportar a Markdown", "Export to Markdown"), FileName = MarkdownExport.FileName(c), DefaultExt = ".md",
+            Filter = "Markdown (*.md)|*.md", AddExtension = true, OverwritePrompt = true,
+            InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            Paths.WriteText(dialog.FileName, MarkdownExport.Render(c, Loc.Current, TimeZoneInfo.Local, AboutWindow.VersionText));
+        }
+        catch (Exception ex)
+        {
+            ShowToast(tr("No se pudo guardar: ", "Could not save: ") + ex.Message);
+            return;
+        }
+        ShowToast(tr("Guardada: ", "Saved: ") + Path.GetFileName(dialog.FileName));
+        if (Settings.Current.OpenAfterExport)
+        {
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(dialog.FileName) { UseShellExecute = true }); }
+            catch (Exception ex) { ShowToast(tr("No se pudo abrir: ", "Could not open: ") + ex.Message); }
+        }
+    }
+
+    /// <summary>"Export to Markdown…" and the "Open after exporting" option, for a menu.</summary>
+    private void AddExportItems(ItemsControl menu, Func<Conversation> which)
+    {
+        var export = new MenuItem { Header = tr("Exportar a Markdown…", "Export to Markdown…") };
+        export.Click += (s, e) => ExportMarkdown(which());
+        var open = new MenuItem { Header = tr("Abrir después de exportar", "Open after exporting"), IsCheckable = true, IsChecked = Settings.Current.OpenAfterExport, StaysOpenOnClick = true };
+        open.Click += (s, e) => { Settings.Current.OpenAfterExport = open.IsChecked; Settings.Current.Save(); };
+        menu.Items.Add(export);
+        menu.Items.Add(open);
     }
 
     private UIElement ConversationRow(Conversation c)
@@ -431,8 +574,7 @@ internal sealed class MainWindow : Window
         text.Children.Add(new TextBlock
         {
             Text = c.Updated.ToLocalTime().ToString(Loc.Current == UiLanguage.Es ? "d MMM, HH:mm" : "MMM d, HH:mm",
-                                                    System.Globalization.CultureInfo.GetCultureInfo(Loc.Current == UiLanguage.Es ? "es-ES" : "en-US")),
-            FontSize = 11, Foreground = Theme.Secondary, Margin = new Thickness(0, 2, 0, 0),
+                                                    System.Globalization.CultureInfo.GetCultureInfo(Loc.Current == UiLanguage.Es ? "es-ES" : "en-US")),            FontSize = 11, Foreground = Theme.Secondary, Margin = new Thickness(0, 2, 0, 0),
         });
         var row = new Border
         {
@@ -458,6 +600,7 @@ internal sealed class MainWindow : Window
                 model.Delete(c.Id);
         };
         menu.Items.Add(rename);
+        if (c.Messages.Count > 0) AddExportItems(menu, () => c);
         menu.Items.Add(new Separator());
         menu.Items.Add(delete);
         row.ContextMenu = menu;
@@ -503,7 +646,13 @@ internal sealed class MainWindow : Window
         {
             messagesPanel.Children.Clear();
             answerViews.Clear();
-            foreach (var m in c.Messages) messagesPanel.Children.Add(MessageView(m, c));
+            messageViews.Clear();
+            foreach (var m in c.Messages)
+            {
+                var view = MessageView(m, c);
+                messagesPanel.Children.Add(view);
+                if (view is FrameworkElement element) messageViews[m.Id] = element;
+            }
             welcomeShown = false;
             shownConversation = c.Id;
             shownCount = c.Messages.Count;
@@ -641,6 +790,7 @@ internal sealed class MainWindow : Window
 
     private string StatusText()
     {
+        if (updateNote != null) return updateNote;
         if (model.Reachable == null) return tr("Buscando Ollama…", "Looking for Ollama…");
         string remote = Connection.RemoteHost;
         if (model.Reachable == false)
@@ -694,6 +844,7 @@ internal sealed class MainWindow : Window
         bool ctrl = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
         if (ctrl && e.Key == Key.N) { model.NewConversation(); composer.Focus(); e.Handled = true; }
         else if (ctrl && e.Key == Key.OemComma) { OpenSettings(); e.Handled = true; }
+        else if (ctrl && e.Key == Key.F) { searchBox.Focus(); searchBox.SelectAll(); e.Handled = true; }
         else if (e.Key == Key.Escape && (model.IsGenerating || model.IsDraftingMemory)) { model.Stop(); e.Handled = true; }
     }
 
@@ -706,7 +857,12 @@ internal sealed class MainWindow : Window
         settingsWindow.Show();
     }
 
-    private void OpenAbout() => new AboutWindow { Owner = this }.ShowDialog();
+    private void OpenAbout()
+    {
+        var about = new AboutWindow { Owner = this };
+        about.ShowDialog();
+        if (about.CheckForUpdates) _ = CheckUpdatesAsync(true);
+    }
 }
 
 /// <summary>One answer: folded reasoning, the Markdown text and a footer with Copy and the stats.</summary>

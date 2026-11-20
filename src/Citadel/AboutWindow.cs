@@ -28,6 +28,9 @@ internal sealed class AboutWindow : Window
     private const string LicenseUrl = "https://www.gnu.org/licenses/old-licenses/gpl-2.0.html";
     public const string Repository = "https://github.com/Gabriel-Castiglia/citadel-windows";
 
+    /// <summary>True when the window was closed with "Check for updates".</summary>
+    public bool CheckForUpdates { get; private set; }
+
     public AboutWindow()
     {
         Width = 460;
@@ -73,9 +76,13 @@ internal sealed class AboutWindow : Window
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 18, 0, 0) };
         var license = new Button { Content = tr("Ver licencia", "View license"), Padding = new Thickness(14, 5, 14, 5), MinWidth = 96 };
         license.Click += (s, e) => ShowLicense();
+        // The check runs in the main window once this one closes, so its questions have a window to belong to.
+        var updates = new Button { Content = tr("Buscar actualizaciones", "Check for updates"), Padding = new Thickness(14, 5, 14, 5), MinWidth = 96, Margin = new Thickness(8, 0, 0, 0) };
+        updates.Click += (s, e) => { CheckForUpdates = true; Close(); };
         var close = new Button { Content = tr("Cerrar", "Close"), Padding = new Thickness(14, 5, 14, 5), MinWidth = 96, Margin = new Thickness(8, 0, 0, 0), IsDefault = true, IsCancel = true };
         close.Click += (s, e) => Close();
         buttons.Children.Add(license);
+        buttons.Children.Add(updates);
         buttons.Children.Add(close);
         root.Children.Add(buttons);
         Content = root;

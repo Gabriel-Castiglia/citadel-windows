@@ -2,6 +2,31 @@
 
 All notable changes to Citadel for Windows. Versions follow [semantic versioning](https://semver.org): major.minor.patch.
 
+## 1.3.0 - 2026-11-20
+
+### Added
+
+- Updates that install themselves, as in Gryphmark: once a day (and from About → Check for updates)
+  Citadel looks for a newer release on GitHub and asks once: Update now, What's new or Later. Update now
+  downloads `citadel-setup.exe`, checks it against the release's `SHA256SUMS.txt` (a file that does not
+  match is deleted and never run), waits for or stops an answer in progress as the user chooses, closes,
+  installs in silence keeping the language chosen at installation, and opens Citadel again with the text
+  being typed and the open conversation. The stand-alone `Citadel.exe` only offers the release page.
+- Search in the text of every saved conversation, ignoring case, accents and line breaks: the results
+  show the conversation, the date and the words around the match, highlighted, and a click opens the
+  conversation at that message. Ctrl+F goes to the search field.
+- Export a conversation to Markdown, from the header or from the sidebar menu: title, date, model and
+  each turn under its own heading, with code blocks intact; "Open after exporting" opens the file with
+  the app Windows uses for `.md` files.
+- The setup accepts `/CITADELWAITPID=<pid>` and `/CITADELRELAUNCH=1`, used by the updates.
+- `scripts\build.ps1` also writes `dist\SHA256SUMS.txt`.
+- `--self-test` checks the search, the export and the update checks first, without Ollama;
+  `--self-test --offline` runs only those.
+
+### Changed
+
+- The search field, which only looked at titles, also lists the matches in the messages.
+
 ## 1.2.0 - 2026-11-10
 
 ### Added

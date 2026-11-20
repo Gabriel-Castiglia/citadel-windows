@@ -1,7 +1,7 @@
 Citadel for Windows
 ===================
 
-Gabriel Castiglia · November 10, 2026 · version 1.2.0 · GPL-2.0 license
+Gabriel Castiglia · November 20, 2026 · version 1.3.0 · GPL-2.0 license
 
 English · Español (README.es.txt)
 
@@ -12,10 +12,12 @@ PDF manual: docs/Citadel-manual-en.pdf
 Citadel is a chat app for Windows 10 and 11 that talks to language models running on the same
 computer through Ollama <https://ollama.com>. Nothing you write leaves the computer: the app only
 connects to Ollama at 127.0.0.1:11434, unless you choose to reach Ollama on another computer of
-yours through SSH (see Ollama on another computer (#ollama-on-another-computer)). It is written in
-C# with .NET 10 and WPF, uses the Windows 11 style, dark, light or as Windows, in one of twelve
-colours, and its interface is in English and Spanish. A macOS version with the same features lives
-in its own repository, https://github.com/Gabriel-Castiglia/citadel.
+yours through SSH (see Ollama on another computer (#ollama-on-another-computer)); the only other
+connection is the daily check for a new version on GitHub (see Updates (#updates)), which sends
+nothing of yours. It is written in C# with .NET 10 and WPF, uses the Windows 11 style, dark, light
+or as Windows, in one of twelve colours, and its interface is in English and Spanish. A macOS
+version with the same features lives in its own repository,
+https://github.com/Gabriel-Castiglia/citadel.
 
 Citadel is a chat window, not an agent. The model cannot open files, run commands or browse the web.
 What it gets is what you type, the text files you attach, a set of rules sent with every request
@@ -64,6 +66,21 @@ Running a newer citadel-setup.exe updates an installed Citadel and keeps each us
 memories and settings. If Citadel is running, setup closes it before replacing its files. An older
 version cannot be installed over a newer one.
 
+Updates
+-------
+
+An installed Citadel looks for a newer version once a day, and About → Check for updates looks at
+once. When there is one, it asks a single question: Update now, What's new (opens the release page)
+or Later. Update now does the rest by itself: it downloads citadel-setup.exe from the release,
+checks it against the release's SHA256SUMS.txt (a file that does not match is deleted and never
+run), closes Citadel, installs the new version in silence with the language chosen when Citadel was
+installed, and opens Citadel again. Windows asks for administrator rights, as in any installation.
+If an answer is being written, Citadel first asks whether to wait for it or stop it, so it is saved
+in its conversation; the text being typed, its attachments and the open conversation come back after
+the restart. If the installation fails or is declined, the previous version opens again.
+
+The stand-alone Citadel.exe cannot update itself: it only offers the release page.
+
 The files are not signed with a commercial certificate, so the first time Windows SmartScreen may
 show "Windows protected your PC". "More info" → "Run anyway" opens them.
 
@@ -93,8 +110,24 @@ Conversations
 
 The sidebar lists the conversations, newest first. Ctrl+N or the pencil button starts a new one, and
 its title is the first line of the first message. Right-click a conversation to rename it or delete
-it; deleting asks first and removes its file from disk. The search field filters by title, ignoring
-case and accents.
+it; deleting asks first and removes its file from disk.
+
+Search
+------
+
+The search field (Ctrl+F) looks in every saved conversation, ignoring case, accents and line breaks.
+Conversations whose title matches come first; below, under "In the messages", each message that
+contains the text (what you wrote or an answer) is listed with its conversation, its date and the
+words around the match, highlighted. Clicking a result opens that conversation at that message.
+
+Export to Markdown
+------------------
+
+The export button in the header, next to the language, saves the conversation shown as a .md file;
+right-clicking a conversation in the sidebar exports that one. The file has the title, the date, the
+model, and each turn under a "User" or "Assistant" heading; answers keep their Markdown and their
+code blocks intact, and attachments and reasoning go in folded blocks. With "Open after exporting"
+checked in the same menu, the file opens in the app Windows uses for .md files.
 
 Models
 ------
@@ -178,10 +211,10 @@ Settings
 The Settings button at the bottom of the sidebar (or Ctrl+,) opens a window with three tabs.
 
   Tab        What it holds
-  ---------- ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  ---------- ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   Memories   The memory folder (Choose…, or Default to go back to %APPDATA%\Citadel\memories), the list of memories with their index lines, Open folder, Show in File Explorer for each memory, and Delete, which asks first and removes the file and its index line.
   Rules      The rules sent at the start of every request, editable. Save (Ctrl+S) writes them; Revert discards the changes; Restore defaults puts back the original rules.
-  Ollama     Where Ollama runs: on this computer, or on another one through SSH (see Ollama on another computer (#ollama-on-another-computer)). Apply and test connects at once and lists the models found.
+  Ollama     Where Ollama runs: on this computer, or on another one through SSH (see Ollama on another computer (#ollama-on-another-computer)); the only other connection is the daily check for a new version on GitHub (see Updates (#updates)), which sends nothing of yours. Apply and test connects at once and lists the models found.
 
 Any folder can be the memory folder, including one that another tool also uses, as long as it keeps
 the same _index.md format.
@@ -267,10 +300,11 @@ Keyboard
 --------
 
   Keys                     Action
-  ------------------------ ----------------------------
+  ------------------------ -----------------------------
   Enter                    Send
   Shift+Enter, Alt+Enter   New line
   Ctrl+N                   New conversation
+  Ctrl+F                   Search in the conversations
   Esc                      Stop the answer
   Ctrl+,                   Settings
   Ctrl+S                   Save the rules (Rules tab)
@@ -286,6 +320,8 @@ Files
   Memories (default folder)                                                             %APPDATA%\Citadel\memories\, with _index.md
   Settings (language, model, Reason, memory folder, SSH destination, window position)   %APPDATA%\Citadel\settings.json
   Error log, if anything fails                                                          %APPDATA%\Citadel\citadel.log, kept under 512 KB
+  Date of the last update check                                                         %APPDATA%\Citadel\update-check.txt
+  Downloaded update (while it installs)                                                 %TEMP%\CitadelUpdate\
 
 Files are written in UTF-8 without a byte order mark. Conversations are plain JSON in the same
 format as the macOS version, so they can be copied between the two.
@@ -299,9 +335,10 @@ With the .NET 10 SDK <https://dotnet.microsoft.com/download> installed:
     powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 
 The first command builds the program. The second builds everything in dist: the stand-alone
-Citadel.exe, citadel.msi and citadel-setup.exe; the WiX Toolset 5 is restored automatically as a
-NuGet package. The version is set in one place, src\Citadel\Citadel.csproj, and the installers and
-the About window read it from there.
+Citadel.exe, citadel.msi, citadel-setup.exe and SHA256SUMS.txt, which is published with them so that
+updates can check the setup; the WiX Toolset 5 is restored automatically as a NuGet package. The
+version is set in one place, src\Citadel\Citadel.csproj, and the installers and the About window
+read it from there.
 
 The program has two modes for maintenance. Both take --data-folder <folder> to use a folder other
 than %APPDATA%\Citadel, so they never touch real conversations.
@@ -309,10 +346,17 @@ than %APPDATA%\Citadel, so they never touch real conversations.
 - Citadel.exe --self-test --memory-folder <empty folder> runs the main features end to end against
   Ollama and prints one PASS or FAIL line per check: listing the models, an answer with Reason off
   and with Reason on, Stop, /save (file, index line, no byte order mark) and /mem. It refuses to run
-  against a memory folder in use. Its output can be read with
+  against a memory folder in use. Before those, and without Ollama, it checks the search, the
+  Markdown export (against the expected file) and the update checks (version comparison,
+  SHA256SUMS.txt, the release answer, a download that does not match), with made-up conversations in
+  a temporary folder; --self-test --offline runs only these. Its output can be read with
   Start-Process Citadel.exe -ArgumentList ... -Wait -NoNewWindow -RedirectStandardOutput out.txt.
 - Citadel.exe --screenshot <file.png> --window main|settings|about|save --language en|es draws one
-  window to an image and exits.
+  window to an image and exits; --search <text> shows the sidebar with the results of a search.
+
+citadel-setup.exe /quiet /norestart /CITADELWAITPID=<pid> /CITADELRELAUNCH=1 is how an update runs
+the setup: it waits for that Citadel process to close before replacing anything, and opens Citadel
+again when it ends.
 
 scripts\screenshots.ps1 -Demo <folder> renders the images in docs\images with demonstration
 conversations and memories, scripts/manual.sh (on macOS, with pandoc and Google Chrome) builds the

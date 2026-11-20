@@ -11,7 +11,7 @@
 #  It is distributed WITHOUT ANY WARRANTY. See the LICENSE file for details.
 #
 
-# Renders the main window, the welcome screen, the memory preview, Settings, About and two pages of the
+# Renders the main window, a search, the welcome screen, the memory preview, Settings, About and two pages of the
 # setup window, in English and Spanish, to docs\images\ for the manuals. It uses the --screenshot option
 # of each program: the windows are drawn to files and the programs exit by themselves.
 #
@@ -54,6 +54,9 @@ try {
             $name = if ($window -eq 'main') { 'chat' } else { $window }
             Render $exe (Join-Path $images "$name-$language.png") @('--window', $window, '--language', $language)
         }
+        # A search in the text of the demonstration conversations.
+        $query = @{ en = 'list'; es = 'lista' }[$language]
+        Render $exe (Join-Path $images "search-$language.png") @('--window', 'main', '--language', $language, '--search', $query)
         Remove-Item (Join-Path $data 'conversations\*.json')
         Render $exe (Join-Path $images "welcome-$language.png") @('--window', 'main', '--language', $language)
         foreach ($page in 'install', 'uninstall') {

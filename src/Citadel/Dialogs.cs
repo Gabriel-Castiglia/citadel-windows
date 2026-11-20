@@ -51,6 +51,36 @@ internal static class Dialogs
         return w.ShowDialog() == true;
     }
 
+    /// <summary>
+    /// A question with several answers, shown as buttons from left to right; returns the index of the one
+    /// clicked, or -1 when the window is closed. The first button is also the Esc answer.
+    /// </summary>
+    public static int Choose(Window owner, string title, string message, string[] answers, int defaultAnswer)
+    {
+        var w = Make(owner, "Citadel");
+        w.Width = 500;
+        int chosen = -1;
+        var panel = new StackPanel { Margin = new Thickness(22, 18, 22, 18) };
+        panel.Children.Add(new TextBlock { Text = title, FontSize = 16, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
+        panel.Children.Add(new TextBlock { Text = message, FontSize = 13, Foreground = Theme.Secondary, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 0) });
+        var row = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 18, 0, 0) };
+        for (int i = 0; i < answers.Length; i++)
+        {
+            int index = i;
+            var b = new Button
+            {
+                Content = answers[i], MinWidth = 90, Padding = new Thickness(14, 5, 14, 5), Margin = new Thickness(i == 0 ? 0 : 8, 0, 0, 0),
+                IsDefault = i == defaultAnswer, IsCancel = i == 0,
+            };
+            b.Click += (s, e) => { chosen = index; w.DialogResult = true; };
+            row.Children.Add(b);
+        }
+        panel.Children.Add(row);
+        w.Content = panel;
+        w.ShowDialog();
+        return chosen;
+    }
+
     /// <summary>Asks for one line of text; returns null when canceled.</summary>
     public static string Prompt(Window owner, string title, string label, string initial, string okText)
     {

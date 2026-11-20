@@ -33,11 +33,14 @@ internal static class Program
         //   --data-folder <folder>     use this folder instead of %APPDATA%\Citadel
         //   --memory-folder <folder>   use this memory folder
         //   --language en|es           interface language for this run
-        //   --self-test                run the main features against Ollama and print PASS/FAIL lines
+        //   --self-test                run the main features against Ollama and print PASS/FAIL lines;
+        //                              with --offline, only the checks that need no Ollama
         //   --screenshot <file.png>    render a window to a PNG and exit; --window main|settings|about|save,
-        //                              --tab N (settings), --appearance auto|light|dark, --accent KEY
-        string shot = null, window = "main", language = null, appearance = null, accent = null;
-        bool selfTest = false;
+        //                              --tab N (settings), --appearance auto|light|dark, --accent KEY,
+        //                              --search TEXT (main: the sidebar shows the results of a search)
+        //   --updated                  started by the setup after an update (a short note says so)
+        string shot = null, window = "main", language = null, appearance = null, accent = null, search = null;
+        bool selfTest = false, offline = false;
         for (int i = 0; i < args.Length; i++)
         {
             string next = i + 1 < args.Length ? args[i + 1] : null;
@@ -51,7 +54,9 @@ internal static class Program
                 case "--appearance" when next != null: appearance = next; i++; break;
                 case "--accent" when next != null: accent = next; i++; break;
                 case "--tab" when next != null: shotTab = int.TryParse(next, out var t) ? t : -1; i++; break;
+                case "--search" when next != null: search = next; i++; break;
                 case "--self-test": selfTest = true; break;
+                case "--offline": offline = true; break;
             }
         }
         bool test = selfTest || shot != null;
@@ -82,14 +87,14 @@ internal static class Program
         if (selfTest)
         {
             // No window: the memory preview would wait for a click.
-            app.Startup += async (s, e) => app.Shutdown(await SelfTest.Run(model) ? 0 : 1);
+            app.Startup += async (s, e) => app.Shutdown(await SelfTest.Run(model, offline) ? 0 : 1);
             return app.Run();
         }
         var main = new MainWindow(model);
         app.MainWindow = main;
         if (shot != null)
         {
-            app.Startup += async (s, e) => app.Shutdown(await Screenshot(model, main, window, shot) ? 0 : 1);
+            app.Startup += async (s, e) => app.Shutdown(await Screenshot(model, main, window, shot, search) ? 0 : 1);
             return app.Run();
         }
         main.Show();
@@ -99,7 +104,7 @@ internal static class Program
     }
 
     /// <summary>Shows one window off to the side, waits for Ollama's status, and saves its picture.</summary>
-    private static async Task<bool> Screenshot(ChatModel model, MainWindow main, string which, string path)
+    private static async Task<bool> Screenshot(ChatModel model, MainWindow main, string which, string path, string search)
     {
         main.Width = 1180;
         main.Height = 760;
@@ -108,6 +113,7 @@ internal static class Program
         main.Top = 0;
         main.Show();
         await model.RefreshStatus();
+        if (search != null) main.ShowSearch(search);
         Window target = main;
         switch (which)
         {

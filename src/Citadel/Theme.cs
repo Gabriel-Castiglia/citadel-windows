@@ -168,7 +168,8 @@ internal static class Theme
         GlyphInfo = "\uE946", GlyphSend = "\uE724", GlyphStop = "\uE71A", GlyphCopy = "\uE8C8", GlyphCheck = "\uE73E",
         GlyphBulb = "\uE82F", GlyphChevronRight = "\uE76C", GlyphChevronDown = "\uE70D", GlyphBookmark = "\uE8F1",
         GlyphDocument = "\uE8A5", GlyphTrash = "\uE74D", GlyphFolder = "\uE8B7",
-        GlyphRefresh = "\uE72C", GlyphWarning = "\uE7BA", GlyphClose = "\uE711", GlyphDownload = "\uE896";
+        GlyphRefresh = "\uE72C", GlyphWarning = "\uE7BA", GlyphClose = "\uE711", GlyphDownload = "\uE896",
+        GlyphExport = "\uEDE1";
 
     public static TextBlock Icon(string glyph, double size = 14, Brush brush = null) => new()
     {
