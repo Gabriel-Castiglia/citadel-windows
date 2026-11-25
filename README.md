@@ -1,6 +1,6 @@
 # Citadel for Windows
 
-Gabriel Castiglia · November 20, 2026 · version 1.3.0 · GPL-2.0 license
+Gabriel Castiglia · November 25, 2026 · version 1.3.1 · GPL-2.0 license
 
 English · [Español](README.es.md)
 
@@ -71,8 +71,10 @@ version cannot be installed over a newer one.
 
 An installed Citadel looks for a newer version once a day, and About → Check for updates looks at
 once. When there is one, it asks a single question: Update now, What's new (opens the release page) or
-Later. Update now does the rest by itself: it downloads `citadel-setup.exe` from the release, checks it
-against the release's `SHA256SUMS.txt` (a file that does not match is deleted and never run), closes
+Later. Update now does the rest by itself: it checks that the release's `SHA256SUMS.txt` carries the author's
+signature (`release.sig`, checked against two keys built into Citadel; a release without a valid one installs
+nothing and can only be downloaded by hand from its page), downloads `citadel-setup.exe`, checks it against that
+`SHA256SUMS.txt` (a file that does not match is deleted and never run), closes
 Citadel, installs the new version in silence with the language chosen when Citadel was installed, and
 opens Citadel again. Windows asks for administrator rights, as in any installation. If an answer is
 being written, Citadel first asks whether to wait for it or stop it, so it is saved in its conversation;
@@ -330,8 +332,8 @@ powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 ```
 
 The first command builds the program. The second builds everything in `dist`: the stand-alone
-`Citadel.exe`, `citadel.msi`, `citadel-setup.exe` and `SHA256SUMS.txt`, which is published with them
-so that updates can check the setup; the WiX Toolset 5 is restored automatically as a NuGet package. The version is set in one place, `src\Citadel\Citadel.csproj`, and the installers and
+`Citadel.exe`, `citadel.msi`, `citadel-setup.exe` and `SHA256SUMS.txt`, which is published with them,
+signed in `release.sig`, so that updates can check the setup; the WiX Toolset 5 is restored automatically as a NuGet package. The version is set in one place, `src\Citadel\Citadel.csproj`, and the installers and
 the About window read it from there.
 
 The program has two modes for maintenance. Both take `--data-folder <folder>` to use a folder other

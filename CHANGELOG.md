@@ -2,6 +2,16 @@
 
 All notable changes to Citadel for Windows. Versions follow [semantic versioning](https://semver.org): major.minor.patch.
 
+## 1.3.1 - 2026-11-25
+
+### Changed
+
+- **Updates signed by the author**: the `SHA256SUMS.txt` of a release must now carry the author's signature
+  (`release.sig`, ECDSA P-256, checked against two keys built into Citadel) before the setup is downloaded. Before,
+  the setup was checked only against hashes from the same page, so a release put there by someone else would have
+  installed itself. A release without a valid signature is offered as a page, to download by hand. Anyone can still
+  download, install and share Citadel; Citadel 1.3.0 and older install this one as usual.
+
 ## 1.3.0 - 2026-11-20
 
 ### Added

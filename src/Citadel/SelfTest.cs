@@ -299,10 +299,22 @@ internal static class SelfTest
                     { "name": "citadel-setup.exe", "browser_download_url": "https://example.invalid/citadel-setup.exe" },
                     { "name": "citadel.msi", "browser_download_url": "https://example.invalid/citadel.msi" },
                     { "name": "Citadel.exe", "browser_download_url": "https://example.invalid/Citadel.exe" },
-                    { "name": "SHA256SUMS.txt", "browser_download_url": "https://example.invalid/SHA256SUMS.txt" } ] }
+                    { "name": "SHA256SUMS.txt", "browser_download_url": "https://example.invalid/SHA256SUMS.txt" },
+                    { "name": "release.sig", "browser_download_url": "https://example.invalid/release.sig" } ] }
                 """);
-            Check(release.Tag == "1.3.0" && release.SetupUrl.EndsWith("/citadel-setup.exe") && release.SumsUrl.EndsWith("/SHA256SUMS.txt") && release.Page.EndsWith("/v1.3.0"),
-                  "update: the release gives its version, page, setup and hashes");
+            Check(release.Tag == "1.3.0" && release.SetupUrl.EndsWith("/citadel-setup.exe") && release.SumsUrl.EndsWith("/SHA256SUMS.txt") && release.Page.EndsWith("/v1.3.0")
+                  && release.SigUrl.EndsWith("/release.sig"),
+                  "update: the release gives its version, page, setup, hashes and signature");
+            // release.sig: real signatures by the author's two keys (the PC's, the Mac's) of the same bytes; any change is refused
+            var signedSums = System.Text.Encoding.UTF8.GetBytes("0123456789abcdef0123456789abcdef0123456789abcdef0123456789ABCDEF  Vigia-Setup-9.9.9.exe\n"
+                                                                + "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff *Vigia_Manual_EN.pdf\n");
+            const string pcSig = "rEEKYRSXLO7VKbID/El7ZkFBh1uKIPNS38KopNSZ6DEm7knfIUjxch9kmv8xfREc6bLKka+bePFZ1BKzO+15ww==";
+            const string macSig = "K8+3h6FgPjn2ZyH3HsLWof4obfKfyW00p3YKE9WQFoEF+umfN6/OMxMQNrQbc3XqkKrZSz3QexCBIZEMrdrvKg==";
+            var changedSums = (byte[])signedSums.Clone(); changedSums[0] ^= 1;
+            Check(ReleaseSignature.Valid(signedSums, pcSig + "\n") && ReleaseSignature.Valid(signedSums, macSig)
+                  && !ReleaseSignature.Valid(changedSums, pcSig) && !ReleaseSignature.Valid(changedSums, macSig)
+                  && !ReleaseSignature.Valid(signedSums, "") && !ReleaseSignature.Valid(signedSums, null) && !ReleaseSignature.Valid(signedSums, "not base64!"),
+                  "update: the release signature, either key, exactly those bytes");
             string download = Path.Combine(temp, "citadel-setup.exe");
             File.WriteAllText(download, "not really a setup");
             string good = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(download))).ToLowerInvariant();

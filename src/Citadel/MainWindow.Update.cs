@@ -28,12 +28,15 @@ internal sealed class ReleaseInfo
     public string Page { get; init; }
     public string SetupUrl { get; init; }
     public string SumsUrl { get; init; }
+    /// <summary>release.sig: the author's signature of SHA256SUMS.txt (ReleaseSignature.cs).</summary>
+    public string SigUrl { get; init; }
 }
 
 /// <summary>
 /// About → Check for updates (and once a day by itself): when GitHub has a newer release, one question, and
 /// then everything happens alone. citadel-setup.exe is downloaded and checked against the release's
-/// SHA256SUMS.txt (a file that does not match is deleted, never run). An answer being written is waited for
+/// SHA256SUMS.txt, which must carry the author's signature (release.sig, ReleaseSignature.cs: without a valid one
+/// nothing is downloaded); a file that does not match is deleted, never run. An answer being written is waited for
 /// or stopped, as the user chooses, so it is saved; the text being typed, its attachments and the open
 /// conversation are kept for the next start. The setup runs in silence keeping the language chosen when
 /// Citadel was installed, waits for this window to be gone, and opens Citadel again. A stand-alone
@@ -101,7 +104,7 @@ internal sealed partial class MainWindow
     {
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
-        string setup = null, sums = null;
+        string setup = null, sums = null, sig = null;
         if (root.TryGetProperty("assets", out var assets))
             foreach (var a in assets.EnumerateArray())
             {
@@ -109,6 +112,7 @@ internal sealed partial class MainWindow
                 string url = a.GetProperty("browser_download_url").GetString();
                 if (name.Equals(SetupAsset, StringComparison.OrdinalIgnoreCase)) setup = url;
                 else if (name.Equals(SumsAsset, StringComparison.OrdinalIgnoreCase)) sums = url;
+                else if (name.Equals(ReleaseSignature.AssetName, StringComparison.OrdinalIgnoreCase)) sig = url;
             }
         return new ReleaseInfo
         {
@@ -116,6 +120,7 @@ internal sealed partial class MainWindow
             Page = root.TryGetProperty("html_url", out var page) ? page.GetString() : null,
             SetupUrl = setup,
             SumsUrl = sums,
+            SigUrl = sig,
         };
     }
 
@@ -184,7 +189,7 @@ internal sealed partial class MainWindow
             // A window that is busy with a dialog of its own is not interrupted by the daily check.
             if (!interactive && OwnedWindows.Cast<Window>().Any(w => w is MemoryPreviewWindow)) return;
             string title = tr($"Hay una versión nueva de Citadel: {release.Tag}", $"A new version of Citadel is available: {release.Tag}");
-            if (!IsInstalledCopy() || release.SetupUrl == null || release.SumsUrl == null)
+            if (!IsInstalledCopy() || release.SetupUrl == null || release.SumsUrl == null || release.SigUrl == null)
             {
                 // A stand-alone Citadel.exe, or a release without its setup or its hashes: only the page.
                 string why = IsInstalledCopy()
@@ -233,7 +238,13 @@ internal sealed partial class MainWindow
             string file = Path.Combine(UpdateDir, SetupAsset);
             using (var http = NewHttp(TimeSpan.FromMinutes(15)))
             {
-                string expected = HashFor(await http.GetStringAsync(release.SumsUrl), SetupAsset)
+                // the author's signature of the hashes first (ReleaseSignature.cs): without a valid one nothing is
+                // downloaded or run, so a release someone else put on the page never installs itself
+                byte[] sums = await http.GetByteArrayAsync(release.SumsUrl);
+                if (!ReleaseSignature.Valid(sums, await http.GetStringAsync(release.SigUrl)))
+                    throw new InvalidOperationException(tr("La versión publicada no trae una firma válida del autor: no se instaló nada. Se puede bajar a mano desde su página.",
+                                                           "The release does not carry a valid signature of the author: nothing was installed. It can be downloaded by hand from its page."));
+                string expected = HashFor(System.Text.Encoding.UTF8.GetString(sums), SetupAsset)
                     ?? throw new InvalidOperationException(tr($"{SumsAsset} no trae el hash de {SetupAsset}.", $"{SumsAsset} has no hash for {SetupAsset}."));
                 using (var resp = await http.GetAsync(release.SetupUrl, HttpCompletionOption.ResponseHeadersRead))
                 {

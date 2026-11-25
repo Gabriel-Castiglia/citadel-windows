@@ -1,7 +1,7 @@
 Citadel para Windows
 ====================
 
-Gabriel Castiglia · 20 de noviembre de 2026 · versión 1.3.0 · licencia GPL-2.0
+Gabriel Castiglia · 25 de noviembre de 2026 · versión 1.3.1 · licencia GPL-2.0
 
 English (README.txt) · Español
 
@@ -73,14 +73,16 @@ Actualizaciones
 
 Un Citadel instalado busca una versión nueva una vez por día, y Acerca de → Buscar actualizaciones
 busca en el momento. Si la hay, hace una sola pregunta: Actualizar ahora, Ver novedades (abre la
-página de la versión) o Más tarde. Actualizar ahora hace el resto solo: descarga citadel-setup.exe
-de la versión, lo comprueba con el SHA256SUMS.txt de la versión (un archivo que no coincide se borra
-y nunca se ejecuta), cierra Citadel, instala la versión nueva en silencio con el idioma elegido al
-instalar Citadel y vuelve a abrirlo. Windows pide permisos de administrador, como en cualquier
-instalación. Si se está escribiendo una respuesta, Citadel primero pregunta si esperarla o
-detenerla, así queda guardada en su conversación; el texto que se estaba escribiendo, sus adjuntos y
-la conversación abierta vuelven después del reinicio. Si la instalación falla o se rechaza, se
-vuelve a abrir la versión anterior.
+página de la versión) o Más tarde. Actualizar ahora hace el resto solo: comprueba que el
+SHA256SUMS.txt de la versión lleve la firma del autor (release.sig, que se comprueba con dos claves
+que trae Citadel; una versión sin firma válida no instala nada y solo se puede bajar a mano desde su
+página), descarga citadel-setup.exe y lo comprueba con ese SHA256SUMS.txt (un archivo que no
+coincide se borra y nunca se ejecuta), cierra Citadel, instala la versión nueva en silencio con el
+idioma elegido al instalar Citadel y vuelve a abrirlo. Windows pide permisos de administrador, como
+en cualquier instalación. Si se está escribiendo una respuesta, Citadel primero pregunta si
+esperarla o detenerla, así queda guardada en su conversación; el texto que se estaba escribiendo,
+sus adjuntos y la conversación abierta vuelven después del reinicio. Si la instalación falla o se
+rechaza, se vuelve a abrir la versión anterior.
 
 El Citadel.exe independiente no puede actualizarse solo: solo ofrece la página de la versión.
 
@@ -350,10 +352,10 @@ Con el SDK de .NET 10 <https://dotnet.microsoft.com/download> instalado:
     powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 
 El primer comando compila el programa. El segundo genera todo en dist: el Citadel.exe independiente,
-citadel.msi, citadel-setup.exe y SHA256SUMS.txt, que se publica con ellos para que las
-actualizaciones comprueben el instalador; el WiX Toolset 5 se descarga solo como paquete de NuGet.
-La versión se fija en un solo lugar, src\Citadel\Citadel.csproj, y los instaladores y la ventana
-Acerca de la leen de ahí.
+citadel.msi, citadel-setup.exe y SHA256SUMS.txt, que se publica con ellos, firmado en release.sig,
+para que las actualizaciones comprueben el instalador; el WiX Toolset 5 se descarga solo como
+paquete de NuGet. La versión se fija en un solo lugar, src\Citadel\Citadel.csproj, y los
+instaladores y la ventana Acerca de la leen de ahí.
 
 El programa tiene dos modos para mantenimiento. Los dos aceptan --data-folder <carpeta> para usar
 otra carpeta en lugar de %APPDATA%\Citadel, así nunca tocan las conversaciones reales.

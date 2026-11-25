@@ -32,6 +32,11 @@ command -v pandoc >/dev/null || { echo "pandoc is missing: brew install pandoc (
 native() { if command -v cygpath >/dev/null; then cygpath -m "$1"; else printf '%s' "$1"; fi; }
 REPO="https://github.com/Gabriel-Castiglia/citadel-windows"
 VERSION=$(sed -n 's|.*<Version>\(.*\)</Version>.*|\1|p' src/Citadel/Citadel.csproj | head -1)
+# The line under the title of each README names the version (Muelle's went out three versions behind): it must be
+# the program's.
+for f in README.md:version README.es.md:versión; do
+    grep -q "· ${f#*:} $VERSION ·" "${f%%:*}" || { echo "${f%%:*} does not say \"${f#*:} $VERSION\" under its title" >&2; exit 1; }
+done
 
 TEMP="$(mktemp -d)"
 trap 'rm -rf "$TEMP"' EXIT
