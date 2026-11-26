@@ -1,6 +1,6 @@
 # Citadel for Windows
 
-Gabriel Castiglia · November 25, 2026 · version 1.3.1 · GPL-2.0 license
+Gabriel Castiglia · November 27, 2026 · version 1.3.2 · GPL-2.0 license
 
 English · [Español](README.es.md)
 

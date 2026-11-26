@@ -2,6 +2,14 @@
 
 All notable changes to Citadel for Windows. Versions follow [semantic versioning](https://semver.org): major.minor.patch.
 
+## 1.3.2 - 2026-11-27
+
+### Changed
+
+- **A new icon**: a castle with its keep and two towers, and a speech bubble for a pennant, drawn as a flat picture,
+  cream with a black outline on the chosen colour; it still follows the colour chosen in the settings, in all twelve
+  colours. The drawing is in `icon/citadel.svg`.
+
 ## 1.3.1 - 2026-11-25
 
 ### Changed
