@@ -116,12 +116,15 @@ internal sealed partial class MainWindow : Window
         if (!area.IntersectsWith(r)) return;
         WindowStartupLocation = WindowStartupLocation.Manual;
         Left = r.Left; Top = r.Top; Width = r.Width; Height = r.Height;
+        // Maximized on the screen where its normal bounds are; restoring it gives those bounds back.
+        if (Settings.Current.Maximized) WindowState = WindowState.Maximized;
     }
 
     private void SaveBounds()
     {
         var r = WindowState == WindowState.Normal ? new Rect(Left, Top, Width, Height) : RestoreBounds;
         Settings.Current.Window = [r.Left, r.Top, r.Width, r.Height];
+        Settings.Current.Maximized = WindowState == WindowState.Maximized;
         Settings.Current.Save();
     }
 
@@ -157,7 +160,7 @@ internal sealed partial class MainWindow : Window
         var panel = new DockPanel { Background = Theme.Sidebar };
 
         var top = new DockPanel { Margin = new Thickness(16, 14, 10, 10) };
-        var newButton = Theme.FlatButton(Theme.GlyphEdit, null, model.NewConversation, tr("Conversación nueva (Ctrl+N)", "New conversation (Ctrl+N)"), 15);
+        var newButton = Theme.FlatButton(Theme.GlyphEdit, null, model.NewConversation, tr("Conversación nueva (Ctrl+N)", "New conversation (Ctrl+N)", "新しい会話 (Ctrl+N)"), 15);
         DockPanel.SetDock(newButton, Dock.Right);
         top.Children.Add(newButton);
         top.Children.Add(new TextBlock { Text = "Citadel", FontSize = 16, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
@@ -170,7 +173,7 @@ internal sealed partial class MainWindow : Window
             Foreground = Theme.Text, VerticalContentAlignment = VerticalAlignment.Center, Padding = new Thickness(0),
             CaretBrush = Theme.Text,
         };
-        var searchHint = new TextBlock { Text = tr("Buscar", "Search"), FontSize = 13, Foreground = Theme.Tertiary, IsHitTestVisible = false, VerticalAlignment = VerticalAlignment.Center };
+        var searchHint = new TextBlock { Text = tr("Buscar", "Search", "検索"), FontSize = 13, Foreground = Theme.Tertiary, IsHitTestVisible = false, VerticalAlignment = VerticalAlignment.Center };
         searchBox.TextChanged += (s, e) =>
         {
             searchHint.Visibility = searchBox.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -193,8 +196,8 @@ internal sealed partial class MainWindow : Window
         panel.Children.Add(search);
 
         var bottom = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(10, 6, 10, 12) };
-        bottom.Children.Add(Theme.FlatButton(Theme.GlyphSettings, tr("Ajustes", "Settings"), OpenSettings, "Ctrl+,"));
-        bottom.Children.Add(Theme.FlatButton(Theme.GlyphInfo, null, OpenAbout, tr("Acerca de Citadel", "About Citadel")));
+        bottom.Children.Add(Theme.FlatButton(Theme.GlyphSettings, tr("Ajustes", "Settings", "設定"), OpenSettings, "Ctrl+,"));
+        bottom.Children.Add(Theme.FlatButton(Theme.GlyphInfo, null, OpenAbout, tr("Acerca de Citadel", "About Citadel", "Citadel について")));
         DockPanel.SetDock(bottom, Dock.Bottom);
         panel.Children.Add(bottom);
         var separator = new Border { Height = 1, Background = Theme.Stroke, Margin = new Thickness(12, 0, 12, 0) };
@@ -218,17 +221,17 @@ internal sealed partial class MainWindow : Window
     private void LanguageMenu(Button anchor)
     {
         var menu = new ContextMenu { PlacementTarget = anchor, Placement = PlacementMode.Bottom };
-        menu.Items.Add(new MenuItem { Header = "Idioma / Language", IsEnabled = false });
-        foreach (var (lang, name) in new[] { (UiLanguage.En, "English"), (UiLanguage.Es, "Español") })
+        menu.Items.Add(new MenuItem { Header = Loc.MenuLabel, IsEnabled = false });
+        foreach (var lang in Loc.All)
         {
-            var item = new MenuItem { Header = name, IsCheckable = true, IsChecked = Loc.Current == lang };
+            var item = new MenuItem { Header = Loc.NativeName(lang), IsCheckable = true, IsChecked = Loc.Current == lang };
             item.Click += (s, e) => SetLanguage(lang);
             menu.Items.Add(item);
         }
         menu.IsOpen = true;
     }
 
-    private static void SetLanguage(UiLanguage lang)
+    public static void SetLanguage(UiLanguage lang)
     {
         Loc.Current = lang;
         Settings.Current.Save();
@@ -242,9 +245,9 @@ internal sealed partial class MainWindow : Window
         chatArea.RowDefinitions.Add(new RowDefinition());
         chatArea.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        // Header: title, language and model picker.
+        // Header: title, export, language and model picker.
         var header = new DockPanel { Margin = new Thickness(22, 10, 16, 10), Height = 34 };
-        modelPicker = new ComboBox { MinWidth = 200, FontSize = 12.5, ToolTip = tr("Modelo de Ollama", "Ollama model"), VerticalAlignment = VerticalAlignment.Center };
+        modelPicker = new ComboBox { MinWidth = 200, FontSize = 12.5, ToolTip = tr("Modelo de Ollama", "Ollama model", "Ollama のモデル"), VerticalAlignment = VerticalAlignment.Center };
         modelPicker.DropDownOpened += async (s, e) => await model.RefreshStatus();
         modelPicker.SelectionChanged += (s, e) =>
         {
@@ -253,17 +256,15 @@ internal sealed partial class MainWindow : Window
         DockPanel.SetDock(modelPicker, Dock.Right);
         header.Children.Add(modelPicker);
         // Interface language, next to the model so it is easy to find.
-        var language = Theme.FlatButton(Theme.GlyphGlobe, Loc.Current == UiLanguage.Es ? "Español" : "English", null,
-                                        "Idioma / Language", 12.5);
+        var language = Theme.FlatButton(Theme.GlyphGlobe, Loc.NativeName(Loc.Current), null, Loc.MenuLabel, 12.5);
         language.Margin = new Thickness(0, 0, 8, 0);
-        System.Windows.Automation.AutomationProperties.SetName(language, "Idioma / Language");
+        System.Windows.Automation.AutomationProperties.SetName(language, Loc.MenuLabel);
         language.Click += (s, e) => LanguageMenu(language);
         DockPanel.SetDock(language, Dock.Right);
         header.Children.Add(language);
         // Export the conversation shown to a Markdown file.
-        var export = Theme.FlatButton(Theme.GlyphExport, null, null, tr("Exportar a Markdown", "Export to Markdown"), 13);
+        var export = Theme.FlatButton(Theme.GlyphExport, null, null, tr("Exportar a Markdown", "Export to Markdown", "Markdown にエクスポート"), 13);
         export.Margin = new Thickness(0, 0, 4, 0);
-        System.Windows.Automation.AutomationProperties.SetName(export, tr("Exportar a Markdown", "Export to Markdown"));
         export.Click += (s, e) =>
         {
             var menu = new ContextMenu { PlacementTarget = export, Placement = PlacementMode.Bottom };
@@ -329,7 +330,7 @@ internal sealed partial class MainWindow : Window
         };
         placeholder = new TextBlock
         {
-            Text = tr("Escribe un mensaje…  (/mem tema · /save)", "Message…  (/mem topic · /save)"), FontSize = 14.5,
+            Text = tr("Escribe un mensaje…  (/mem tema · /save)", "Message…  (/mem topic · /save)", "メッセージを入力…  (/mem トピック · /save)"), FontSize = 14.5,
             Foreground = Theme.Tertiary, IsHitTestVisible = false, Margin = new Thickness(4, 4, 0, 0),
         };
         composer.TextChanged += (s, e) =>
@@ -374,16 +375,19 @@ internal sealed partial class MainWindow : Window
         textGrid.Children.Add(placeholder);
         textGrid.Children.Add(composer);
 
-        reasonButton = new Button { Template = Theme.FlatTemplate(13), Cursor = Cursors.Hand, Focusable = false, Padding = new Thickness(10, 4, 12, 4) };
+        reasonButton = new Button { Template = Theme.FlatTemplate(13), Cursor = Cursors.Hand, Padding = new Thickness(10, 4, 12, 4) };
+        Theme.KeyboardReachable(reasonButton, null, 13);
         reasonButton.Click += (s, e) => model.Reason = !model.Reason;
         reasonHint = new TextBlock
         {
             Text = tr("Más lento (20 a 90 s), mucho más preciso en cuentas, conteos, lógica y fechas.",
-                      "Slower (20-90 s), much more accurate on math, counting, logic and dates."),
+                      "Slower (20-90 s), much more accurate on math, counting, logic and dates.",
+                      "時間はかかります (20～90 秒) が、計算、数え上げ、論理、日付がはるかに正確になります。"),
             FontSize = 11.5, Foreground = Theme.Secondary, VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(10, 0, 8, 0),
         };
-        sendButton = new Button { Template = Theme.FlatTemplate(15), Width = 30, Height = 30, Cursor = Cursors.Hand, Focusable = false };
+        sendButton = new Button { Template = Theme.FlatTemplate(15), Width = 30, Height = 30, Cursor = Cursors.Hand };
+        Theme.KeyboardReachable(sendButton, null, 15);
         sendButton.Click += (s, e) => { if (model.IsGenerating || model.IsDraftingMemory) model.Stop(); else model.Send(); };
 
         var tools = new DockPanel { Margin = new Thickness(0, 8, 0, 0) };
@@ -446,13 +450,13 @@ internal sealed partial class MainWindow : Window
         {
             conversationList.Children.Add(new TextBlock
             {
-                Text = tr("En los mensajes", "In the messages") + $" ({found.Count}{(found.Count >= MaxHits ? "+" : "")})",
+                Text = tr("En los mensajes", "In the messages", "メッセージ内") + $" ({found.Count}{(found.Count >= MaxHits ? "+" : "")})",
                 FontSize = 11.5, FontWeight = FontWeights.SemiBold, Foreground = Theme.Secondary, Margin = new Thickness(10, list.Count > 0 ? 12 : 2, 0, 6),
             });
             foreach (var h in found) conversationList.Children.Add(HitRow(h));
         }
         if (list.Count == 0 && found.Count == 0 && model.Search.Trim().Length > 0)
-            conversationList.Children.Add(new TextBlock { Text = tr("Sin resultados", "No results"), FontSize = 12, Foreground = Theme.Secondary, Margin = new Thickness(12) });
+            conversationList.Children.Add(new TextBlock { Text = tr("Sin resultados", "No results", "一致する結果はありません"), FontSize = 12, Foreground = Theme.Secondary, Margin = new Thickness(12) });
     }
 
     private const int MaxHits = 200;
@@ -480,15 +484,15 @@ internal sealed partial class MainWindow : Window
     }
 
     private static string ShortDate(DateTime utc) =>
-        utc.ToLocalTime().ToString(Loc.Current == UiLanguage.Es ? "d MMM yyyy, HH:mm" : "MMM d yyyy, HH:mm",
-                                   System.Globalization.CultureInfo.GetCultureInfo(Loc.Current == UiLanguage.Es ? "es-ES" : "en-US"));
+        utc.ToLocalTime().ToString(Loc.Current switch { UiLanguage.Es => "d MMM yyyy, HH:mm", UiLanguage.Ja => "yyyy年M月d日 H:mm", _ => "MMM d yyyy, HH:mm" },
+                                   System.Globalization.CultureInfo.GetCultureInfo(Loc.CultureName));
 
     /// <summary>A search result: the conversation, the date of the message and the text around the match, highlighted.</summary>
     private UIElement HitRow(SearchHit h)
     {
         var text = new StackPanel();
         text.Children.Add(new TextBlock { Text = h.Conversation.DisplayTitle, FontSize = 12.5, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis, Foreground = Theme.Text });
-        string who = h.Message.Role == Role.User ? tr("Tú", "You") : tr("Respuesta", "Answer");
+        string who = h.Message.Role == Role.User ? tr("Tú", "You", "あなた") : tr("Respuesta", "Answer", "回答");
         text.Children.Add(new TextBlock { Text = $"{who} · {ShortDate(h.Message.Date)}", FontSize = 11, Foreground = Theme.Secondary, Margin = new Thickness(0, 1, 0, 2) });
         var fragment = new TextBlock { FontSize = 12, Foreground = Theme.Secondary, TextWrapping = TextWrapping.Wrap, MaxHeight = 50, TextTrimming = TextTrimming.CharacterEllipsis };
         fragment.Inlines.Add(new System.Windows.Documents.Run(h.Before));
@@ -499,7 +503,7 @@ internal sealed partial class MainWindow : Window
         {
             CornerRadius = new CornerRadius(8), Padding = new Thickness(10, 6, 10, 7), Margin = new Thickness(0, 0, 0, 2),
             Background = Brushes.Transparent, Child = text, Cursor = Cursors.Hand,
-            ToolTip = tr("Abrir la conversación en este mensaje", "Open the conversation at this message"),
+            ToolTip = tr("Abrir la conversación en este mensaje", "Open the conversation at this message", "このメッセージの位置で会話を開く"),
         };
         row.MouseEnter += (s, e) => row.Background = Theme.Card;
         row.MouseLeave += (s, e) => row.Background = Brushes.Transparent;
@@ -526,10 +530,10 @@ internal sealed partial class MainWindow : Window
     /// <summary>Saves a conversation as a Markdown file, and opens it after when that option is on.</summary>
     private void ExportMarkdown(Conversation c)
     {
-        if (c == null || c.Messages.Count == 0) { ShowToast(tr("Esta conversación todavía está vacía.", "This conversation is still empty.")); return; }
+        if (c == null || c.Messages.Count == 0) { ShowToast(tr("Esta conversación todavía está vacía.", "This conversation is still empty.", "この会話はまだ空です。")); return; }
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
-            Title = tr("Exportar a Markdown", "Export to Markdown"), FileName = MarkdownExport.FileName(c), DefaultExt = ".md",
+            Title = tr("Exportar a Markdown", "Export to Markdown", "Markdown にエクスポート"), FileName = MarkdownExport.FileName(c), DefaultExt = ".md",
             Filter = "Markdown (*.md)|*.md", AddExtension = true, OverwritePrompt = true,
             InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
         };
@@ -540,23 +544,23 @@ internal sealed partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            ShowToast(tr("No se pudo guardar: ", "Could not save: ") + ex.Message);
+            ShowToast(tr("No se pudo guardar: ", "Could not save: ", "保存できませんでした: ") + ex.Message);
             return;
         }
-        ShowToast(tr("Guardada: ", "Saved: ") + Path.GetFileName(dialog.FileName));
+        ShowToast(tr("Guardada: ", "Saved: ", "保存しました: ") + Path.GetFileName(dialog.FileName));
         if (Settings.Current.OpenAfterExport)
         {
             try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(dialog.FileName) { UseShellExecute = true }); }
-            catch (Exception ex) { ShowToast(tr("No se pudo abrir: ", "Could not open: ") + ex.Message); }
+            catch (Exception ex) { ShowToast(tr("No se pudo abrir: ", "Could not open: ", "開けませんでした: ") + ex.Message); }
         }
     }
 
     /// <summary>"Export to Markdown…" and the "Open after exporting" option, for a menu.</summary>
     private void AddExportItems(ItemsControl menu, Func<Conversation> which)
     {
-        var export = new MenuItem { Header = tr("Exportar a Markdown…", "Export to Markdown…") };
+        var export = new MenuItem { Header = tr("Exportar a Markdown…", "Export to Markdown…", "Markdown にエクスポート…") };
         export.Click += (s, e) => ExportMarkdown(which());
-        var open = new MenuItem { Header = tr("Abrir después de exportar", "Open after exporting"), IsCheckable = true, IsChecked = Settings.Current.OpenAfterExport, StaysOpenOnClick = true };
+        var open = new MenuItem { Header = tr("Abrir después de exportar", "Open after exporting", "エクスポート後に開く"), IsCheckable = true, IsChecked = Settings.Current.OpenAfterExport, StaysOpenOnClick = true };
         open.Click += (s, e) => { Settings.Current.OpenAfterExport = open.IsChecked; Settings.Current.Save(); };
         menu.Items.Add(export);
         menu.Items.Add(open);
@@ -573,8 +577,9 @@ internal sealed partial class MainWindow : Window
         });
         text.Children.Add(new TextBlock
         {
-            Text = c.Updated.ToLocalTime().ToString(Loc.Current == UiLanguage.Es ? "d MMM, HH:mm" : "MMM d, HH:mm",
-                                                    System.Globalization.CultureInfo.GetCultureInfo(Loc.Current == UiLanguage.Es ? "es-ES" : "en-US")),            FontSize = 11, Foreground = Theme.Secondary, Margin = new Thickness(0, 2, 0, 0),
+            Text = c.Updated.ToLocalTime().ToString(Loc.Current switch { UiLanguage.Es => "d MMM, HH:mm", UiLanguage.Ja => "M月d日 H:mm", _ => "MMM d, HH:mm" },
+                                                    System.Globalization.CultureInfo.GetCultureInfo(Loc.CultureName)),
+            FontSize = 11, Foreground = Theme.Secondary, Margin = new Thickness(0, 2, 0, 0),
         });
         var row = new Border
         {
@@ -585,18 +590,18 @@ internal sealed partial class MainWindow : Window
         row.MouseLeave += (s, e) => { if (!selected) row.Background = Brushes.Transparent; };
         row.MouseLeftButtonUp += (s, e) => model.Select(c.Id);
         var menu = new ContextMenu();
-        var rename = new MenuItem { Header = tr("Renombrar…", "Rename…") };
+        var rename = new MenuItem { Header = tr("Renombrar…", "Rename…", "名前の変更…") };
         rename.Click += (s, e) =>
         {
-            string title = Dialogs.Prompt(this, tr("Renombrar conversación", "Rename conversation"), tr("Título", "Title"), c.DisplayTitle, tr("Renombrar", "Rename"));
+            string title = Dialogs.Prompt(this, tr("Renombrar conversación", "Rename conversation", "会話の名前の変更"), tr("Título", "Title", "タイトル"), c.DisplayTitle, tr("Renombrar", "Rename", "変更"));
             if (title != null) model.Rename(c.Id, title);
         };
-        var delete = new MenuItem { Header = tr("Eliminar…", "Delete…") };
+        var delete = new MenuItem { Header = tr("Eliminar…", "Delete…", "削除…") };
         delete.Click += (s, e) =>
         {
-            if (Dialogs.Confirm(this, tr("¿Eliminar esta conversación?", "Delete this conversation?"),
-                                tr($"«{c.DisplayTitle}» se borrará del disco. No se puede deshacer.", $"“{c.DisplayTitle}” will be removed from disk. This cannot be undone."),
-                                tr("Eliminar", "Delete")))
+            if (Dialogs.Confirm(this, tr("¿Eliminar esta conversación?", "Delete this conversation?", "この会話を削除しますか?"),
+                                tr("«{0}» se borrará del disco. No se puede deshacer.", "“{0}” will be removed from disk. This cannot be undone.", "「{0}」をディスクから削除します。元に戻すことはできません。", c.DisplayTitle),
+                                tr("Eliminar", "Delete", "削除")))
                 model.Delete(c.Id);
         };
         menu.Items.Add(rename);
@@ -614,7 +619,7 @@ internal sealed partial class MainWindow : Window
         if (!items.Contains(model.SelectedModel)) items.Insert(0, model.SelectedModel);
         // Models that cannot reason are marked, so the choice is clear before sending.
         string Label(string name) =>
-            model.ReasoningModels.TryGetValue(name, out bool can) && !can ? name + tr("  (sin Razonar)", "  (no Reason)") : name;
+            model.ReasoningModels.TryGetValue(name, out bool can) && !can ? name + tr("  (sin Razonar)", "  (no Reason)", "  (推論なし)") : name;
         var current = modelPicker.Items.Cast<ComboBoxItem>().Select(i => (string)i.Tag + "\n" + i.Content).ToList();
         if (!current.SequenceEqual(items.Select(m => m + "\n" + Label(m))))
         {
@@ -691,7 +696,7 @@ internal sealed partial class MainWindow : Window
                 view.Update(model.IsGenerating && m == c.Messages[^1]);
                 return view.Root;
             case Role.Memory:
-                return Theme.Chip(Theme.GlyphBookmark, tr("memoria cargada: ", "memory loaded: ") + m.MemoryFile).Also(x => x.Margin = new Thickness(0, 0, 0, 22));
+                return Theme.Chip(Theme.GlyphBookmark, tr("memoria cargada: ", "memory loaded: ", "読み込んだメモリ: ") + m.MemoryFile).Also(x => x.Margin = new Thickness(0, 0, 0, 22));
             default:
                 return new StackPanel
                 {
@@ -709,11 +714,12 @@ internal sealed partial class MainWindow : Window
     {
         var stack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 60, 0, 0), MaxWidth = 540 };
         stack.Children.Add(new Image { Source = Theme.AppIcon, Width = 88, Height = 88 });
-        stack.Children.Add(new TextBlock { Text = tr("¿En qué te ayudo?", "How can I help?"), FontSize = 26, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 16, 0, 8) });
+        stack.Children.Add(new TextBlock { Text = tr("¿En qué te ayudo?", "How can I help?", "何をお手伝いしましょうか?"), FontSize = 26, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 16, 0, 8) });
         stack.Children.Add(new TextBlock
         {
             Text = tr("Todo corre en esta computadora con Ollama: nada de lo que escribas sale de ella.",
-                      "Everything runs on this computer through Ollama: nothing you write leaves it."),
+                      "Everything runs on this computer through Ollama: nothing you write leaves it.",
+                      "すべてこのコンピューター上の Ollama で動作します。入力した内容が外に出ることはありません。"),
             FontSize = 13, Foreground = Theme.Secondary, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap,
         });
         var hints = new StackPanel();
@@ -723,10 +729,11 @@ internal sealed partial class MainWindow : Window
             Children = { Theme.Icon(glyph, 14, Theme.Accent).Also(i => i.Width = 24), new TextBlock { Text = text, FontSize = 12.5, Foreground = Theme.Secondary, TextWrapping = TextWrapping.Wrap } },
         });
         Hint(Theme.GlyphBulb, tr("Razonar: más lento (20 a 90 s) y mucho más preciso en cuentas, conteos, lógica y fechas.",
-                                 "Reason: slower (20 to 90 s) and much more accurate on math, counting, logic and dates."));
-        Hint(Theme.GlyphBookmark, tr("/mem <tema> carga una memoria guardada en la conversación.", "/mem <topic> loads a saved memory into the conversation."));
-        Hint(Theme.GlyphDownload, tr("/save escribe una memoria con lo importante de esta conversación.", "/save writes a memory with what matters from this conversation."));
-        Hint(Theme.GlyphDocument, tr("Arrastra un .txt o .md al cuadro de texto para adjuntarlo.", "Drag a .txt or .md file onto the text box to attach it."));
+                                 "Reason: slower (20 to 90 s) and much more accurate on math, counting, logic and dates.",
+                                 "推論: 時間はかかります (20～90 秒) が、計算、数え上げ、論理、日付がはるかに正確になります。"));
+        Hint(Theme.GlyphBookmark, tr("/mem <tema> carga una memoria guardada en la conversación.", "/mem <topic> loads a saved memory into the conversation.", "/mem <トピック> で、保存したメモリを会話に読み込みます。"));
+        Hint(Theme.GlyphDownload, tr("/save escribe una memoria con lo importante de esta conversación.", "/save writes a memory with what matters from this conversation.", "/save で、この会話の大事な点をメモリに書き出します。"));
+        Hint(Theme.GlyphDocument, tr("Arrastra un .txt o .md al cuadro de texto para adjuntarlo.", "Drag a .txt or .md file onto the text box to attach it.", ".txt または .md のファイルを入力欄にドラッグすると添付できます。"));
         stack.Children.Add(new Border { CornerRadius = new CornerRadius(14), Background = Theme.Sidebar, Padding = new Thickness(18, 14, 18, 14), Margin = new Thickness(0, 22, 0, 0), Child = hints });
         return stack;
     }
@@ -737,17 +744,18 @@ internal sealed partial class MainWindow : Window
         attachmentPanel.Visibility = model.Attachments.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
         foreach (var a in model.Attachments.ToList())
         {
-            var remove = Theme.FlatButton(Theme.GlyphClose, null, () => { model.Attachments.Remove(a); OnModelChanged(); }, tr("Quitar", "Remove"), 10);
+            var remove = Theme.FlatButton(Theme.GlyphClose, null, () => { model.Attachments.Remove(a); OnModelChanged(); }, tr("Quitar", "Remove", "削除"), 10);
             attachmentPanel.Children.Add(new StackPanel
             {
                 Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 8, 0),
-                Children = { Theme.Chip(Theme.GlyphDocument, $"{a.Name} · {a.Text.Length} " + tr("caracteres", "chars")), remove },
+                Children = { Theme.Chip(Theme.GlyphDocument, $"{a.Name} · {a.Text.Length} " + tr("caracteres", "chars", "文字")), remove },
             });
         }
     }
 
     private static string ReasonTip => tr("Más lento (unos 20 a 90 s) pero mucho más preciso en cuentas, conteos, lógica y fechas.",
-                                          "Slower (about 20 to 90 s) but much more accurate on math, counting, logic and dates.");
+                                          "Slower (about 20 to 90 s) but much more accurate on math, counting, logic and dates.",
+                                          "時間はかかります (約 20～90 秒) が、計算、数え上げ、論理、日付がはるかに正確になります。");
 
     private void RefreshComposerButtons()
     {
@@ -755,8 +763,9 @@ internal sealed partial class MainWindow : Window
         reasonButton.IsEnabled = model.CanReason;
         reasonButton.Opacity = model.CanReason ? 1 : 0.45;
         reasonButton.ToolTip = model.CanReason ? ReasonTip
-            : tr($"{model.SelectedModel} no puede razonar: elige otro modelo para usar Razonar.",
-                 $"{model.SelectedModel} cannot reason: choose another model to use Reason.");
+            : tr("{0} no puede razonar: elige otro modelo para usar Razonar.",
+                 "{0} cannot reason: choose another model to use Reason.",
+                 "{0} は推論できません。推論を使うには別のモデルを選んでください。", model.SelectedModel);
         reasonButton.Background = on ? Theme.Accent : Theme.CardHover;
         var fg = on ? Theme.OnAccent : Theme.Secondary;
         reasonButton.Content = new StackPanel
@@ -765,7 +774,7 @@ internal sealed partial class MainWindow : Window
             Children =
             {
                 Theme.Icon(Theme.GlyphBulb, 13, fg),
-                new TextBlock { Text = tr("Razonar", "Reason"), FontSize = 12.5, FontWeight = FontWeights.SemiBold, Foreground = fg, Margin = new Thickness(6, 0, 0, 0) },
+                new TextBlock { Text = tr("Razonar", "Reason", "推論"), FontSize = 12.5, FontWeight = FontWeights.SemiBold, Foreground = fg, Margin = new Thickness(6, 0, 0, 0) },
             },
         };
         reasonHint.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
@@ -774,7 +783,9 @@ internal sealed partial class MainWindow : Window
         sendButton.Background = busy ? Theme.Text : model.CanSend ? Theme.Accent : Theme.CardHover;
         sendButton.Content = Theme.Icon(busy ? Theme.GlyphStop : Theme.GlyphSend, 13,
                                         busy ? Theme.Window : model.CanSend ? Theme.OnAccent : Theme.Secondary);
-        sendButton.ToolTip = busy ? tr("Detener (Esc)", "Stop (Esc)") : tr("Enviar (Enter) · Nueva línea (Shift+Enter)", "Send (Enter) · New line (Shift+Enter)");
+        sendButton.ToolTip = busy ? tr("Detener (Esc)", "Stop (Esc)", "停止 (Esc)") : tr("Enviar (Enter) · Nueva línea (Shift+Enter)", "Send (Enter) · New line (Shift+Enter)", "送信 (Enter) · 改行 (Shift+Enter)");
+        System.Windows.Automation.AutomationProperties.SetName(sendButton, busy ? tr("Detener", "Stop", "停止") : tr("Enviar", "Send", "送信"));
+        System.Windows.Automation.AutomationProperties.SetName(reasonButton, tr("Razonar", "Reason", "推論"));
     }
 
     private void RefreshStatus()
@@ -791,31 +802,32 @@ internal sealed partial class MainWindow : Window
     private string StatusText()
     {
         if (updateNote != null) return updateNote;
-        if (model.Reachable == null) return tr("Buscando Ollama…", "Looking for Ollama…");
+        if (model.Reachable == null) return tr("Buscando Ollama…", "Looking for Ollama…", "Ollama を探しています…");
         string remote = Connection.RemoteHost;
         if (model.Reachable == false)
             return remote != null ? OllamaException.NotReachable().Message
                 : tr("Ollama no responde en 127.0.0.1:11434. Ábrelo desde el menú Inicio o ejecuta: ollama serve",
-                     "Ollama is not reachable at 127.0.0.1:11434. Open it from the Start menu or run: ollama serve");
+                     "Ollama is not reachable at 127.0.0.1:11434. Open it from the Start menu or run: ollama serve",
+                     "127.0.0.1:11434 の Ollama に接続できません。スタート メニューから起動するか、次のコマンドを実行してください: ollama serve");
         int n = model.Models.Count;
-        string where = remote == null ? tr("Ollama conectado", "Ollama connected") : tr($"Ollama en {remote} (SSH)", $"Ollama on {remote} (SSH)");
-        var parts = new List<string> { where + $" · {n} " + (n == 1 ? tr("modelo", "model") : tr("modelos", "models")) };
+        string where = remote == null ? tr("Ollama conectado", "Ollama connected", "Ollama に接続済み") : tr("Ollama en {0} (SSH)", "Ollama on {0} (SSH)", "{0} の Ollama (SSH)", remote);
+        var parts = new List<string> { where + $" · {n} " + (n == 1 ? tr("modelo", "model", "個のモデル") : tr("modelos", "models", "個のモデル")) };
         string name = model.SelectedModel;
         if (model.IsDraftingMemory)
         {
-            parts.Add(tr("Escribiendo la memoria…", "Writing the memory…"));
+            parts.Add(tr("Escribiendo la memoria…", "Writing the memory…", "メモリを書いています…"));
             parts.Add($"{model.Elapsed:0.0} s");
         }
         else if (model.IsGenerating)
         {
             parts.Add(!model.ReceivedFirstToken
-                ? (model.ModelIsLoaded ? tr($"{name} cargado", $"{name} loaded") : tr($"cargando {name}…", $"loading {name}…"))
-                : model.ReceivingThinking ? tr("razonando…", "reasoning…") : tr("escribiendo…", "writing…"));
+                ? (model.ModelIsLoaded ? tr("{0} cargado", "{0} loaded", "{0} 読み込み済み", name) : tr("cargando {0}…", "loading {0}…", "{0} を読み込んでいます…", name))
+                : model.ReceivingThinking ? tr("razonando…", "reasoning…", "推論中…") : tr("escribiendo…", "writing…", "回答中…"));
             parts.Add($"{model.Elapsed:0.0} s");
         }
         else
         {
-            parts.Add(model.ModelIsLoaded ? tr($"{name} cargado", $"{name} loaded") : tr($"{name} se carga con el primer mensaje", $"{name} loads with the first message"));
+            parts.Add(model.ModelIsLoaded ? tr("{0} cargado", "{0} loaded", "{0} 読み込み済み", name) : tr("{0} se carga con el primer mensaje", "{0} loads with the first message", "{0} は最初のメッセージで読み込まれます", name));
             if (model.LastStats is { } s)
             {
                 if (s.TokensPerSecond > 0) parts.Add($"{s.TokensPerSecond:0.0} tok/s");
@@ -897,10 +909,11 @@ internal sealed class AssistantView
         this.model = model;
         var head = new Button
         {
-            Template = Theme.FlatTemplate(4), Background = Brushes.Transparent, Cursor = Cursors.Hand, Focusable = false,
+            Template = Theme.FlatTemplate(4), Background = Brushes.Transparent, Cursor = Cursors.Hand,
             HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(2, 2, 6, 2),
             Content = new StackPanel { Orientation = Orientation.Horizontal, Children = { chevron, Theme.Icon(Theme.GlyphBulb, 13).Also(i => i.Margin = new Thickness(6, 0, 0, 0)), thinkingTitle } },
         };
+        Theme.KeyboardReachable(head, tr("Razonamiento", "Reasoning", "推論の過程"), 4);
         head.Click += (s, e) => { expanded = !expanded; Update(model.IsGenerating && IsLast); };
         thinkingBody = new Border { BorderBrush = Theme.Tertiary, BorderThickness = new Thickness(2, 0, 0, 0), Margin = new Thickness(8, 6, 0, 0), Child = thinkingText };
         thinkingBlock.Children.Add(head);
@@ -920,7 +933,7 @@ internal sealed class AssistantView
         bool live = streaming && m.Content.Length == 0;
         bool showThinking = m.Thinking.Length > 0 || (streaming && m.Reasoned && m.Content.Length == 0);
         thinkingBlock.Visibility = showThinking ? Visibility.Visible : Visibility.Collapsed;
-        thinkingTitle.Text = live ? tr("Razonando…", "Reasoning…") : tr("Razonamiento", "Reasoning");
+        thinkingTitle.Text = live ? tr("Razonando…", "Reasoning…", "推論中…") : tr("Razonamiento", "Reasoning", "推論の過程");
         chevron.Text = expanded ? Theme.GlyphChevronDown : Theme.GlyphChevronRight;
         thinkingBody.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
         if (expanded && thinkingText.Text.Length != m.Thinking.Trim().Length) thinkingText.Text = m.Thinking.Trim();
@@ -929,7 +942,7 @@ internal sealed class AssistantView
         thinkingLast.Visibility = live && !expanded && lastLine.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
 
         waiting.Visibility = streaming && m.Content.Length == 0 && m.Thinking.Length == 0 && !m.Reasoned ? Visibility.Visible : Visibility.Collapsed;
-        waiting.Text = model.ModelIsLoaded ? tr("Pensando la respuesta…", "Working on it…") : tr("Cargando el modelo…", "Loading the model…");
+        waiting.Text = model.ModelIsLoaded ? tr("Pensando la respuesta…", "Working on it…", "回答を考えています…") : tr("Cargando el modelo…", "Loading the model…", "モデルを読み込んでいます…");
 
         body.Visibility = m.Content.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         if (m.Content != renderedContent)
@@ -943,31 +956,32 @@ internal sealed class AssistantView
         if (streaming) return;
         if (m.Content.Length > 0)
         {
-            var label = new TextBlock { Text = tr("Copiar", "Copy"), FontSize = 12, Foreground = Theme.Secondary, Margin = new Thickness(6, 0, 0, 0) };
+            var label = new TextBlock { Text = tr("Copiar", "Copy", "コピー"), FontSize = 12, Foreground = Theme.Secondary, Margin = new Thickness(6, 0, 0, 0) };
             var icon = Theme.Icon(Theme.GlyphCopy, 12);
             var copy = new Button
             {
-                Template = Theme.FlatTemplate(4), Background = Brushes.Transparent, Cursor = Cursors.Hand, Focusable = false, Padding = new Thickness(4, 2, 6, 2),
+                Template = Theme.FlatTemplate(4), Background = Brushes.Transparent, Cursor = Cursors.Hand, Padding = new Thickness(4, 2, 6, 2),
                 Content = new StackPanel { Orientation = Orientation.Horizontal, Children = { icon, label } },
             };
+            Theme.KeyboardReachable(copy, tr("Copiar", "Copy", "コピー"), 4);
             copy.Click += async (s, e) =>
             {
                 Clip.Set(m.Content);
                 icon.Text = Theme.GlyphCheck;
-                label.Text = tr("Copiado", "Copied");
+                label.Text = tr("Copiado", "Copied", "コピーしました");
                 await Task.Delay(1500);
                 icon.Text = Theme.GlyphCopy;
-                label.Text = tr("Copiar", "Copy");
+                label.Text = tr("Copiar", "Copy", "コピー");
             };
             footer.Children.Add(copy);
         }
-        if (m.Stopped) footer.Children.Add(Small(tr("Detenido", "Stopped")));
+        if (m.Stopped) footer.Children.Add(Small(tr("Detenido", "Stopped", "停止しました")));
         if (m.Stats is { } s)
         {
             var parts = new List<string> { s.Model };
             if (s.TokensPerSecond > 0) parts.Add($"{s.TokensPerSecond:0.0} tok/s".Replace(',', '.'));
             parts.Add($"{s.Seconds:0.0} s".Replace(',', '.'));
-            if (m.Reasoned) parts.Add(tr("razonado", "reasoned"));
+            if (m.Reasoned) parts.Add(tr("razonado", "reasoned", "推論あり"));
             footer.Children.Add(Small(string.Join(" · ", parts)));
         }
     }

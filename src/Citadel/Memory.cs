@@ -160,7 +160,7 @@ internal static class MemoryStore
 
         // Confirm only what is really on disk.
         if (!File.Exists(path) || File.ReadAllText(path) != draft.Content || !Entries().Any(e => e.File == file))
-            throw new IOException(tr("No se pudo verificar la memoria guardada en el disco.", "Could not verify the saved memory on disk."));
+            throw new IOException(tr("No se pudo verificar la memoria guardada en el disco.", "Could not verify the saved memory on disk.", "保存したメモリをディスク上で確認できませんでした。"));
         return path;
     }
 
@@ -190,7 +190,7 @@ internal static class MemoryStore
             "\"content\": the full Markdown of the memory.\n" +
             (existing.Length == 0 ? "" : "If one of these existing memories covers the same topic, reuse its file name:\n" + existing);
         string text = await Ollama.Complete(model, [("system", system), ("user", "Conversation:\n\n" + transcript)], false, 3000, true, token);
-        JsonObject obj = ParseObject(text) ?? throw new OllamaException(tr("El modelo no devolvió un JSON válido.", "The model did not return valid JSON."));
+        JsonObject obj = ParseObject(text) ?? throw new OllamaException(tr("El modelo no devolvió un JSON válido.", "The model did not return valid JSON.", "モデルが有効な JSON を返しませんでした。"));
         string file = SanitizeFileName((string)obj["file"] ?? "memory");
         string indexLine = ((string)obj["index_line"] ?? "").Trim();
         if (indexLine.Length == 0) indexLine = Path.GetFileNameWithoutExtension(file).Replace('-', ' ');

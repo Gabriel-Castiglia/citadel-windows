@@ -18,14 +18,14 @@ using static Citadel.Loc;
 
 namespace Citadel;
 
-/// <summary>Small dark dialogs: a confirmation and a one-line text prompt.</summary>
+/// <summary>Small dialogs in the colours of the theme: a confirmation, a question with several answers and a one-line text prompt.</summary>
 internal static class Dialogs
 {
     private static Window Make(Window owner, string title)
     {
         return new Window
         {
-            Title = title, Owner = owner, Width = 420, SizeToContent = SizeToContent.Height, ResizeMode = ResizeMode.NoResize,
+            Language = System.Windows.Markup.XmlLanguage.GetLanguage(Loc.CultureName), Title = title, Owner = owner, Width = 420, SizeToContent = SizeToContent.Height, ResizeMode = ResizeMode.NoResize,
             WindowStartupLocation = owner != null ? WindowStartupLocation.CenterOwner : WindowStartupLocation.CenterScreen,
             Background = Theme.Window, Foreground = Theme.Text, FontFamily = Theme.Ui, ShowInTaskbar = false,
         };
@@ -36,7 +36,7 @@ internal static class Dialogs
         var ok = new Button { Content = okText, IsDefault = true, MinWidth = 90, Padding = new Thickness(14, 5, 14, 5), Margin = new Thickness(8, 0, 0, 0) };
         if (destructive) ok.Foreground = Theme.Warning;
         ok.Click += (s, e) => { if (onOk()) w.DialogResult = true; };
-        var cancel = new Button { Content = tr("Cancelar", "Cancel"), IsCancel = true, MinWidth = 90, Padding = new Thickness(14, 5, 14, 5) };
+        var cancel = new Button { Content = tr("Cancelar", "Cancel", "キャンセル"), IsCancel = true, MinWidth = 90, Padding = new Thickness(14, 5, 14, 5) };
         return new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 18, 0, 0), Children = { cancel, ok } };
     }
 
@@ -102,7 +102,7 @@ internal sealed class MemoryPreviewWindow : Window
 {
     public MemoryPreviewWindow(ChatModel model, MemoryDraft draft)
     {
-        Title = tr("Guardar memoria", "Save memory");
+        Title = tr("Guardar memoria", "Save memory", "メモリを保存");
         Width = 700;
         Height = 620;
         MinWidth = 560;
@@ -110,6 +110,7 @@ internal sealed class MemoryPreviewWindow : Window
         Background = Theme.Window;
         Foreground = Theme.Text;
         FontFamily = Theme.Ui;
+        Theme.Localize(this);
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ShowInTaskbar = false;
 
@@ -132,8 +133,8 @@ internal sealed class MemoryPreviewWindow : Window
             string name = MemoryStore.SanitizeFileName(file.Text);
             bool exists = MemoryStore.Exists(name);
             warning.Visibility = exists ? Visibility.Visible : Visibility.Collapsed;
-            warningText.Text = tr($"Ya existe {name}: se va a reemplazar.", $"{name} already exists: it will be replaced.");
-            lines.Text = content.Text.Split('\n').Length + " " + tr("líneas", "lines");
+            warningText.Text = tr("Ya existe {0}: se va a reemplazar.", "{0} already exists: it will be replaced.", "{0} はすでに存在します。置き換えられます。", name);
+            lines.Text = content.Text.Split('\n').Length + " " + tr("líneas", "lines", "行");
         }
         file.TextChanged += (s, e) => Refresh();
         content.TextChanged += (s, e) => Refresh();
@@ -153,18 +154,20 @@ internal sealed class MemoryPreviewWindow : Window
             Grid.SetColumn(field, 1);
             grid.Children.Add(field);
         }
-        Row(0, tr("Archivo", "File"), file);
-        Row(1, tr("Índice", "Index"), index);
+        Row(0, tr("Archivo", "File", "ファイル"), file);
+        Row(1, tr("Índice", "Index", "インデックス"), index);
 
-        var save = new Button { Content = tr("Guardar", "Save"), IsDefault = true, MinWidth = 90, Padding = new Thickness(14, 5, 14, 5), Margin = new Thickness(8, 0, 0, 0) };
-        var cancel = new Button { Content = tr("Cancelar", "Cancel"), IsCancel = true, MinWidth = 90, Padding = new Thickness(14, 5, 14, 5) };
+        var save = new Button { Content = tr("Guardar", "Save", "保存"), IsDefault = true, MinWidth = 90, Padding = new Thickness(14, 5, 14, 5), Margin = new Thickness(8, 0, 0, 0) };
+        var cancel = new Button { Content = tr("Cancelar", "Cancel", "キャンセル"), IsCancel = true, MinWidth = 90, Padding = new Thickness(14, 5, 14, 5) };
         save.Click += (s, e) =>
         {
             var d = new MemoryDraft { File = file.Text, IndexLine = index.Text, Content = content.Text.Replace("\r\n", "\n") };
             if (model.ConfirmMemory(d, out string message)) Close();
             else error.Text = message;
         };
-        cancel.Click += (s, e) => { model.PendingDraft = null; Close(); };
+        cancel.Click += (s, e) => Close();
+        // However the window closes (Save, Cancel, Esc or its close button), the draft is no longer pending.
+        Closed += (s, e) => model.PendingDraft = null;
 
         var bottom = new DockPanel { Margin = new Thickness(0, 12, 0, 0) };
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Children = { cancel, save } };
@@ -173,7 +176,7 @@ internal sealed class MemoryPreviewWindow : Window
         bottom.Children.Add(lines);
 
         var top = new StackPanel();
-        top.Children.Add(new TextBlock { Text = tr("Guardar memoria", "Save memory"), FontSize = 18, FontWeight = FontWeights.SemiBold });
+        top.Children.Add(new TextBlock { Text = tr("Guardar memoria", "Save memory", "メモリを保存"), FontSize = 18, FontWeight = FontWeights.SemiBold });
         top.Children.Add(new TextBlock { Text = Paths.Short(MemoryStore.Folder), FontSize = 11.5, Foreground = Theme.Secondary, Margin = new Thickness(0, 4, 0, 0) });
         top.Children.Add(grid);
         top.Children.Add(warning);

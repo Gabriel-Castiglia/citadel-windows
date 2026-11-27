@@ -97,7 +97,7 @@ internal sealed class SetupApplication : BootstrapperApplication
 
     /// <summary>
     /// The language of an installed Citadel when there is one (uninstall, repair), otherwise the language of
-    /// Windows if it is Spanish, otherwise English. The user can change it in the window at any time.
+    /// Windows if it is Spanish or Japanese, otherwise English. The user can change it in the window at any time.
     /// </summary>
     private static UiLanguage InitialLanguage()
     {
@@ -107,7 +107,7 @@ internal sealed class SetupApplication : BootstrapperApplication
             if (key?.GetValue("Language") is string code && code.Length > 0) return Loc.FromCode(code);
         }
         catch { }
-        return System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "es" ? UiLanguage.Es : UiLanguage.En;
+        return Loc.FromWindows();
     }
 
     // ---------------- Detect ----------------

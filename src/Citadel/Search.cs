@@ -95,8 +95,8 @@ internal static class ConversationSearch
                 // A character folded into several letters (or a surrogate pair) ends after its last part.
                 if (end < m.Content.Length && char.IsLowSurrogate(m.Content[end])) end++;
                 hits.Add(Fragment(c, m, start, end - start));
-                if (++inThis >= perConversation) break;
                 if (hits.Count >= max) return hits;
+                if (++inThis >= perConversation) break;
             }
         }
         return hits;

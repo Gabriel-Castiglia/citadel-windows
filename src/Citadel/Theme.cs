@@ -27,25 +27,40 @@ internal static class Theme
     /// <summary>The twelve accent colours, as in Wyrmhold, Gryphmark and Citadel for the Mac: a deeper tone
     /// for light windows and a brighter one for dark ones. Each has its icon in accents/&lt;key&gt;.png
     /// (the glow behind the citadel), shown on the window and the taskbar while Citadel runs.</summary>
-    public sealed record AccentInfo(string Key, string Es, string En, uint Light, uint Dark)
+    public sealed record AccentInfo(string Key, uint Light, uint Dark)
     {
-        public string Name => tr(Es, En);
+        /// <summary>The name of the colour in the interface language.</summary>
+        public string Name => Key switch
+        {
+            "green" => tr("Verde", "Green", "グリーン"),
+            "gold" => tr("Dorado", "Gold", "ゴールド"),
+            "purple" => tr("Morado", "Purple", "パープル"),
+            "sky" => tr("Celeste", "Sky blue", "スカイ ブルー"),
+            "ember" => tr("Naranja", "Orange", "オレンジ"),
+            "red" => tr("Rojo", "Red", "レッド"),
+            "yellow" => tr("Amarillo", "Yellow", "イエロー"),
+            "teal" => tr("Verde azulado", "Teal", "ティール"),
+            "blue" => tr("Azul", "Blue", "ブルー"),
+            "pink" => tr("Rosa", "Pink", "ピンク"),
+            "black" => tr("Negro", "Black", "ブラック"),
+            _ => tr("Blanco", "White", "ホワイト"),
+        };
     }
 
     public static readonly AccentInfo[] Accents =
     [
-        new("green", "Verde", "Green", 0x2A9D57, 0x3CCF75),
-        new("gold", "Dorado", "Gold", 0x9A6F00, 0xE2B84C),
-        new("purple", "Morado", "Purple", 0x5B2A86, 0xB392E0),
-        new("sky", "Celeste", "Sky blue", 0x1A8CD8, 0x5CB8F0),
-        new("ember", "Naranja", "Orange", 0xD9652F, 0xF08A5D),
-        new("red", "Rojo", "Red", 0xC8102E, 0xF2545B),
-        new("yellow", "Amarillo", "Yellow", 0xB88A00, 0xF5C842),
-        new("teal", "Verde azulado", "Teal", 0x00796B, 0x4DB6AC),
-        new("blue", "Azul", "Blue", 0x1F5FD1, 0x6E9BFF),
-        new("pink", "Rosa", "Pink", 0xC2185B, 0xF06292),
-        new("black", "Negro", "Black", 0x1D1D1F, 0xC7C7CC),
-        new("white", "Blanco", "White", 0x8E8E93, 0xF5F5F7),
+        new("green", 0x2A9D57, 0x3CCF75),
+        new("gold", 0x9A6F00, 0xE2B84C),
+        new("purple", 0x5B2A86, 0xB392E0),
+        new("sky", 0x1A8CD8, 0x5CB8F0),
+        new("ember", 0xD9652F, 0xF08A5D),
+        new("red", 0xC8102E, 0xF2545B),
+        new("yellow", 0xB88A00, 0xF5C842),
+        new("teal", 0x00796B, 0x4DB6AC),
+        new("blue", 0x1F5FD1, 0x6E9BFF),
+        new("pink", 0xC2185B, 0xF06292),
+        new("black", 0x1D1D1F, 0xC7C7CC),
+        new("white", 0x8E8E93, 0xF5F5F7),
     ];
 
     /// <summary>Raised after the appearance or the accent changes.</summary>
@@ -98,8 +113,10 @@ internal static class Theme
     public static Brush Tertiary => Pick(0x747474, 0x8A8A8E);
     public static Brush Warning => Pick(0xF29D38, 0xB25C00);
 
-    public static readonly FontFamily Ui = new("Segoe UI Variable Text, Segoe UI");
-    public static readonly FontFamily Mono = new("Cascadia Mono, Consolas");
+    /// <summary>Segoe for Latin text; Japanese characters fall back, character by character, to the Windows
+    /// Japanese interface fonts (Yu Gothic UI, or Meiryo UI on systems without it).</summary>
+    public static readonly FontFamily Ui = new("Segoe UI Variable Text, Segoe UI, Yu Gothic UI, Meiryo UI");
+    public static readonly FontFamily Mono = new("Cascadia Mono, Consolas, BIZ UDGothic, MS Gothic");
     /// <summary>Windows 11 icon font, with the Windows 10 one as fallback.</summary>
     public static readonly FontFamily Icons = new("Segoe Fluent Icons, Segoe MDL2 Assets");
 
@@ -128,11 +145,16 @@ internal static class Theme
     {
         w.Background = Window;
         w.Foreground = Text;
+        Localize(w);
         try { w.Icon = AccentIcon(); } catch { }
         var hwnd = new System.Windows.Interop.WindowInteropHelper(w).Handle;
         if (hwnd == IntPtr.Zero) { w.SourceInitialized += (s, e) => DarkTitleBar(w); return; }
         DarkTitleBar(w);
     }
+
+    /// <summary>The language of a window's text, so line breaks and the shapes of Japanese characters follow it.</summary>
+    public static void Localize(FrameworkElement e) =>
+        e.Language = System.Windows.Markup.XmlLanguage.GetLanguage(Loc.CultureName);
 
     [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
@@ -190,11 +212,44 @@ internal static class Theme
             });
         var button = new Button
         {
-            Content = row, Cursor = Cursors.Hand, ToolTip = tooltip, Focusable = false,
+            Content = row, Cursor = Cursors.Hand, ToolTip = tooltip,
             Template = FlatTemplate(), Padding = new Thickness(8, 5, 8, 5), Background = Brushes.Transparent,
         };
+        // Screen readers announce the label or, for an icon alone, the tooltip.
+        KeyboardReachable(button, label ?? tooltip);
         button.Click += (s, e) => click?.Invoke();
         return button;
+    }
+
+    /// <summary>
+    /// Makes a flat button reachable with Tab: it shows a rounded ring in the accent colour when it has the keyboard
+    /// focus, and screen readers announce <paramref name="name"/>. A click with the mouse does not take the focus,
+    /// so the text box being typed in keeps it (as with the buttons of a toolbar).
+    /// </summary>
+    public static void KeyboardReachable(Button button, string name, double radius = 6)
+    {
+        button.Focusable = true;
+        button.IsTabStop = true;
+        button.FocusVisualStyle = FocusRing(radius);
+        if (name != null) System.Windows.Automation.AutomationProperties.SetName(button, name);
+        // ButtonBase focuses itself on a mouse press; while the button is pressed with the mouse it cannot be focused.
+        button.PreviewMouseLeftButtonDown += (s, e) => { if (!button.IsKeyboardFocused) button.Focusable = false; };
+        void Restore() => button.Dispatcher.InvokeAsync(() => button.Focusable = true);
+        button.PreviewMouseLeftButtonUp += (s, e) => Restore();
+        button.LostMouseCapture += (s, e) => Restore();
+    }
+
+    /// <summary>The keyboard focus mark of the flat buttons: a rounded line in the accent colour around the button.</summary>
+    public static Style FocusRing(double radius)
+    {
+        var ring = new FrameworkElementFactory(typeof(Border));
+        ring.SetValue(Border.BorderBrushProperty, Accent);
+        ring.SetValue(Border.BorderThicknessProperty, new Thickness(2));
+        ring.SetValue(Border.CornerRadiusProperty, new CornerRadius(radius + 1));
+        ring.SetValue(FrameworkElement.MarginProperty, new Thickness(-1));
+        var style = new Style(typeof(Control));
+        style.Setters.Add(new Setter(Control.TemplateProperty, new ControlTemplate(typeof(Control)) { VisualTree = ring }));
+        return style;
     }
 
     /// <summary>Template with a rounded background that lights up under the pointer.</summary>

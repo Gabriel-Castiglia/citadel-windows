@@ -52,6 +52,10 @@ internal sealed class ChatModel
     public event Action<string> Toast;
 
     private CancellationTokenSource streamCts, draftCts;
+    /// <summary>The conversation whose answer is streaming, so deleting it also stops the answer.</summary>
+    private Conversation answering;
+    /// <summary>The status refresh in progress; callers share it instead of starting another one.</summary>
+    private Task refreshing;
     private readonly Stopwatch watch = new();
     private readonly System.Windows.Threading.DispatcherTimer ticker = new() { Interval = TimeSpan.FromMilliseconds(100) };
     private readonly System.Windows.Threading.DispatcherTimer poller = new() { Interval = TimeSpan.FromSeconds(4) };
@@ -84,7 +88,8 @@ internal sealed class ChatModel
 
     public void Start(bool loadSaved)
     {
-        try { Rules.EnsureExists(); } catch (Exception ex) { Program.Log("Could not create rules.md: " + ex.Message); }
+        if (Persist)
+            try { Rules.EnsureExists(); } catch (Exception ex) { Program.Log("Could not create rules.md: " + ex.Message); }
         if (loadSaved) Conversations = ConversationStore.LoadAll();
         SelectedId = Conversations.FirstOrDefault()?.Id;
         if (SelectedId == null) NewConversation();
@@ -92,7 +97,13 @@ internal sealed class ChatModel
         _ = RefreshStatus();
     }
 
-    public async Task RefreshStatus()
+    /// <summary>
+    /// Asks Ollama for its models and their state. A refresh already in progress is shared, so a slow or
+    /// unreachable Ollama (or SSH tunnel) does not pile up a new request every time the poller ticks.
+    /// </summary>
+    public Task RefreshStatus() => refreshing is { IsCompleted: false } ? refreshing : refreshing = DoRefreshStatus();
+
+    private async Task DoRefreshStatus()
     {
         try
         {
@@ -162,7 +173,7 @@ internal sealed class ChatModel
 
     public void Delete(Guid id)
     {
-        if (id == SelectedId) Stop();
+        if (id == SelectedId || answering?.Id == id) Stop();
         Conversations.RemoveAll(c => c.Id == id);
         ConversationStore.Delete(id);
         if (SelectedId == id)
@@ -173,9 +184,10 @@ internal sealed class ChatModel
         Changed?.Invoke();
     }
 
+    /// <summary>Writes a conversation that is still in the list (a deleted one must not come back when its answer ends).</summary>
     private void Save(Conversation c)
     {
-        if (Persist && c != null && c.Messages.Count > 0) ConversationStore.Save(c);
+        if (Persist && c != null && c.Messages.Count > 0 && Conversations.Contains(c)) ConversationStore.Save(c);
     }
 
     private void Append(Conversation c, ChatMessage m)
@@ -204,11 +216,18 @@ internal sealed class ChatModel
     {
         if (!IsTextFile(path))
         {
-            Toast?.Invoke(tr("Solo se pueden adjuntar archivos .txt o .md.", "Only .txt and .md files can be attached."));
+            Toast?.Invoke(tr("Solo se pueden adjuntar archivos .txt o .md.", "Only .txt and .md files can be attached.", "添付できるのは .txt と .md のファイルだけです。"));
             return;
         }
-        try { Attachments.Add(new Attachment { Name = Path.GetFileName(path), Text = File.ReadAllText(path) }); }
-        catch { Toast?.Invoke(tr("No se pudo leer el archivo.", "Could not read the file.")); }
+        string name = Path.GetFileName(path);
+        try
+        {
+            if (new FileInfo(path).Length > TextFiles.MaxBytes)
+                Toast?.Invoke(tr("{0} pesa más de 2 MB: no se adjuntó.", "{0} is larger than 2 MB and was not attached.",
+                                 "{0} は 2 MB を超えているため、添付しませんでした。", name));
+            else Attachments.Add(new Attachment { Name = name, Text = TextFiles.Decode(File.ReadAllBytes(path)) });
+        }
+        catch { Toast?.Invoke(tr("No se pudo leer el archivo.", "Could not read the file.", "ファイルを読み込めませんでした。")); }
         Changed?.Invoke();
     }
 
@@ -286,31 +305,18 @@ internal sealed class ChatModel
         watch.Restart();
         ticker.Start();
         streamCts = new CancellationTokenSource();
+        answering = c;
         Changed?.Invoke();
 
-        bool inThinkTag = false;
+        var tags = new ThinkTags();
         ChatChunk final = null;
         try
         {
             await foreach (var chunk in Ollama.StreamChat(model, wire, think, think ? 8000 : 3000, streamCts.Token))
             {
-                string thinking = chunk.Thinking, content = chunk.Content;
-                // Fallback for models that write their reasoning between <think> tags.
-                if (content.Contains("<think>")) { inThinkTag = true; content = content.Replace("<think>", ""); }
-                if (inThinkTag)
-                {
-                    int end = content.IndexOf("</think>", StringComparison.Ordinal);
-                    if (end >= 0) { thinking += content[..end]; content = content[(end + 8)..]; inThinkTag = false; }
-                    else { thinking += content; content = ""; }
-                }
-                if (thinking.Length > 0 || content.Length > 0)
-                {
-                    ReceivedFirstToken = true;
-                    ReceivingThinking = thinking.Length > 0 && content.Length == 0;
-                    answer.Thinking += thinking;
-                    answer.Content += answer.Content.Length == 0 ? content.TrimStart('\n') : content;
-                    MessageChanged?.Invoke(answer);
-                }
+                // Fallback for models that write their reasoning between <think> tags, even split across chunks.
+                var (tagThinking, content) = tags.Feed(chunk.Content);
+                AddToAnswer(answer, chunk.Thinking + tagThinking, content);
                 if (chunk.Done) final = chunk;
             }
         }
@@ -325,6 +331,9 @@ internal sealed class ChatModel
             }
         }
 
+        // A partial tag kept back at the end of the stream was ordinary text after all.
+        var (restThinking, restContent) = tags.Flush();
+        AddToAnswer(answer, restThinking, restContent);
         ticker.Stop();
         double seconds = watch.Elapsed.TotalSeconds;
         if (final is { EvalCount: > 0 })
@@ -342,10 +351,22 @@ internal sealed class ChatModel
         if (answer.Content.Length == 0 && answer.Thinking.Length == 0 && !answer.Stopped) c.Messages.Remove(answer);
         Elapsed = seconds;
         IsGenerating = ReceivingThinking = false;
+        streamCts.Dispose();
         streamCts = null;
+        answering = null;
         Save(c);
         Changed?.Invoke();
         await RefreshStatus();
+    }
+
+    private void AddToAnswer(ChatMessage answer, string thinking, string content)
+    {
+        if (thinking.Length == 0 && content.Length == 0) return;
+        ReceivedFirstToken = true;
+        ReceivingThinking = thinking.Length > 0 && content.Length == 0;
+        answer.Thinking += thinking;
+        answer.Content += answer.Content.Length == 0 ? content.TrimStart('\n') : content;
+        MessageChanged?.Invoke(answer);
     }
 
     /// <summary>Stops the answer (or the memory draft) in progress by closing the connection.</summary>
@@ -361,13 +382,13 @@ internal sealed class ChatModel
     {
         var c = Current;
         if (c == null) return;
-        if (topic.Length == 0) { Notice(tr("Uso: /mem <tema>", "Usage: /mem <topic>")); return; }
+        if (topic.Length == 0) { Notice(tr("Uso: /mem <tema>", "Usage: /mem <topic>", "使い方: /mem <トピック>")); return; }
         var entry = MemoryStore.BestMatch(topic);
-        if (entry == null) { Notice(tr($"Ninguna memoria coincide con «{topic}».", $"No memory matches “{topic}”.")); return; }
+        if (entry == null) { Notice(tr("Ninguna memoria coincide con «{0}».", "No memory matches “{0}”.", "「{0}」に一致するメモリはありません。", topic)); return; }
         string text = MemoryStore.Read(entry.File);
         if (text == null)
         {
-            Notice(tr($"El índice nombra {entry.File}, pero el archivo no existe.", $"The index lists {entry.File}, but the file does not exist."));
+            Notice(tr("El índice nombra {0}, pero el archivo no existe.", "The index lists {0}, but the file does not exist.", "インデックスに {0} がありますが、ファイルが存在しません。", entry.File));
             return;
         }
         if (c.Title.Length == 0) c.Title = "/mem " + topic;
@@ -395,7 +416,10 @@ internal sealed class ChatModel
             }
         }
         string text = string.Join("\n\n", lines);
-        return text.Length > 24000 ? "…" + text[^24000..] : text;
+        if (text.Length <= 24000) return text;
+        int start = text.Length - 24000;
+        if (char.IsLowSurrogate(text[start])) start++;   // never split a surrogate pair
+        return "…" + text[start..];
     }
 
     public async void StartMemoryDraft()
@@ -403,7 +427,7 @@ internal sealed class ChatModel
         var c = Current;
         if (c == null || !c.Messages.Any(m => m.Role is Role.User or Role.Assistant))
         {
-            Notice(tr("No hay nada que guardar todavía.", "There is nothing to save yet."));
+            Notice(tr("No hay nada que guardar todavía.", "There is nothing to save yet.", "保存する内容はまだありません。"));
             return;
         }
         IsDraftingMemory = true;
@@ -418,9 +442,10 @@ internal sealed class ChatModel
             DraftReady?.Invoke(draft);
         }
         catch (OperationCanceledException) { }
-        catch (Exception ex) { Notice(tr("No se pudo preparar la memoria: ", "Could not prepare the memory: ") + ex.Message); }
+        catch (Exception ex) { Notice(tr("No se pudo preparar la memoria: ", "Could not prepare the memory: ", "メモリを準備できませんでした: ") + ex.Message); }
         ticker.Stop();
         IsDraftingMemory = false;
+        draftCts.Dispose();
         draftCts = null;
         Changed?.Invoke();
     }
@@ -434,7 +459,7 @@ internal sealed class ChatModel
             draft.File = MemoryStore.SanitizeFileName(draft.File);
             MemoryStore.Save(draft);
             PendingDraft = null;
-            Notice(tr($"Memoria guardada y verificada en el disco: {draft.File}", $"Memory saved and verified on disk: {draft.File}"));
+            Notice(tr("Memoria guardada y verificada en el disco: {0}", "Memory saved and verified on disk: {0}", "メモリを保存し、ディスク上で確認しました: {0}", draft.File));
             return true;
         }
         catch (Exception ex)
@@ -442,5 +467,111 @@ internal sealed class ChatModel
             error = ex.Message;
             return false;
         }
+    }
+}
+
+/// <summary>
+/// Separates the reasoning that some models write between &lt;think&gt; and &lt;/think&gt; in the text of the answer.
+/// A tag can arrive split between two pieces of the stream ("&lt;thi" and "nk&gt;"): the end of a piece that could
+/// be the start of a tag is kept back until the next piece shows whether it is one.
+/// </summary>
+internal sealed class ThinkTags
+{
+    private const string Open = "<think>", Close = "</think>";
+    private bool inside;
+    private string pending = "";
+
+    /// <summary>The reasoning and the answer text found in the next piece of the stream.</summary>
+    public (string thinking, string content) Feed(string piece)
+    {
+        string text = pending + piece;
+        pending = "";
+        var thinking = new System.Text.StringBuilder();
+        var content = new System.Text.StringBuilder();
+        while (text.Length > 0)
+        {
+            string tag = inside ? Close : Open;
+            var target = inside ? thinking : content;
+            int at = text.IndexOf(tag, StringComparison.Ordinal);
+            if (at >= 0)
+            {
+                target.Append(text, 0, at);
+                text = text[(at + tag.Length)..];
+                inside = !inside;
+                continue;
+            }
+            int keep = PartialTagAtEnd(text, tag);
+            target.Append(text, 0, text.Length - keep);
+            pending = text[^keep..];
+            break;
+        }
+        return (thinking.ToString(), content.ToString());
+    }
+
+    /// <summary>What was kept back when the stream ends, which was not a tag.</summary>
+    public (string thinking, string content) Flush()
+    {
+        string rest = pending;
+        pending = "";
+        return inside ? (rest, "") : ("", rest);
+    }
+
+    /// <summary>The length of the longest end of <paramref name="text"/> that is the start of <paramref name="tag"/>.</summary>
+    private static int PartialTagAtEnd(string text, string tag)
+    {
+        for (int n = Math.Min(text.Length, tag.Length - 1); n > 0; n--)
+            if (string.CompareOrdinal(text, text.Length - n, tag, 0, n) == 0) return n;
+        return 0;
+    }
+}
+
+/// <summary>Reading the text files attached to a message.</summary>
+internal static class TextFiles
+{
+    /// <summary>The largest attachment: 2 MB, already more text than a local model can take in at once.</summary>
+    public const long MaxBytes = 2 * 1024 * 1024;
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    private static extern int GetACP();
+
+    /// <summary>
+    /// The text of a file in whatever encoding it was saved: the one its byte order mark names (UTF-8, UTF-16 or
+    /// UTF-32); otherwise UTF-8 when the bytes are valid UTF-8; otherwise the ANSI code page of Windows (the one
+    /// Notepad used for years, such as Windows-1252 or Shift_JIS), or Latin-1 when that page is not available.
+    /// </summary>
+    public static string Decode(byte[] bytes)
+    {
+        var bom = BomEncoding(bytes, out int skip);
+        if (bom != null) return bom.GetString(bytes, skip, bytes.Length - skip);
+        try { return new System.Text.UTF8Encoding(false, true).GetString(bytes); }
+        catch (System.Text.DecoderFallbackException) { }
+        return AnsiEncoding().GetString(bytes);
+    }
+
+    private static System.Text.Encoding BomEncoding(byte[] b, out int skip)
+    {
+        skip = 0;
+        if (b.Length >= 3 && b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF) { skip = 3; return System.Text.Encoding.UTF8; }
+        if (b.Length >= 4 && b[0] == 0xFF && b[1] == 0xFE && b[2] == 0 && b[3] == 0) { skip = 4; return System.Text.Encoding.UTF32; }
+        if (b.Length >= 4 && b[0] == 0 && b[1] == 0 && b[2] == 0xFE && b[3] == 0xFF) { skip = 4; return new System.Text.UTF32Encoding(true, true); }
+        if (b.Length >= 2 && b[0] == 0xFF && b[1] == 0xFE) { skip = 2; return System.Text.Encoding.Unicode; }
+        if (b.Length >= 2 && b[0] == 0xFE && b[1] == 0xFF) { skip = 2; return System.Text.Encoding.BigEndianUnicode; }
+        return null;
+    }
+
+    /// <summary>The ANSI code page of Windows; Latin-1 when it is UTF-8 itself or cannot be loaded.</summary>
+    public static System.Text.Encoding AnsiEncoding()
+    {
+        try
+        {
+            int page = GetACP();
+            if (page != 65001)
+            {
+                System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+                return System.Text.Encoding.GetEncoding(page);
+            }
+        }
+        catch { }
+        return System.Text.Encoding.Latin1;
     }
 }

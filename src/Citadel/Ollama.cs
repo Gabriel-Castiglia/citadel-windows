@@ -51,9 +51,10 @@ internal sealed class OllamaException(string message) : Exception(message)
     public bool Unreachable { get; init; }
 
     public static OllamaException NotReachable() => new(Connection.RemoteHost is string host
-        ? Connection.LastError ?? tr($"Ollama no responde en {host} (por SSH).", $"Ollama is not reachable on {host} (through SSH).")
+        ? Connection.LastError ?? tr("Ollama no responde en {0} (por SSH).", "Ollama is not reachable on {0} (through SSH).", "{0} の Ollama に接続できません (SSH 経由)。", host)
         : tr("No se puede conectar con Ollama. Ábrelo desde el menú Inicio o ejecuta: ollama serve",
-             "Cannot reach Ollama. Open it from the Start menu or run: ollama serve")) { Unreachable = true };
+             "Cannot reach Ollama. Open it from the Start menu or run: ollama serve",
+             "Ollama に接続できません。スタート メニューから起動するか、次のコマンドを実行してください: ollama serve")) { Unreachable = true };
 }
 
 /// <summary>Minimal client for the local Ollama HTTP API.</summary>
@@ -168,7 +169,9 @@ internal static class Ollama
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception) { throw OllamaException.NotReachable(); }
-        var chunk = ChatChunk.Parse(text);
+        ChatChunk chunk;
+        try { chunk = ChatChunk.Parse(text); }
+        catch (JsonException) { throw new OllamaException(tr("Ollama devolvió una respuesta que no se entiende.", "Ollama returned an answer that cannot be read.", "Ollama から読み取れない応答が返されました。")); }
         if (chunk.Error != null) throw new OllamaException("Ollama: " + chunk.Error);
         return chunk.Content;
     }

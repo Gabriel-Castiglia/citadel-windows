@@ -36,9 +36,17 @@ internal static class Paths
     public static string Log => Path.Combine(Data, "citadel.log");
     public static string DefaultMemoryFolder => Path.Combine(Data, "memories");
 
+    /// <summary>
+    /// Set by --screenshot: the data folder given with --data-folder is shown as the default one
+    /// (%APPDATA%\Citadel), so the pictures in the manuals show the real path and not a temporary folder.
+    /// </summary>
+    public static bool ShowDataAsDefault;
+
     /// <summary>The path with %APPDATA% or %USERPROFILE% in place of the user's own folders.</summary>
     public static string Short(string path)
     {
+        if (ShowDataAsDefault && DataOverride != null && path.StartsWith(DataOverride, StringComparison.OrdinalIgnoreCase))
+            return @"%APPDATA%\Citadel" + path[DataOverride.TrimEnd('\\').Length..];
         foreach (var (folder, name) in new[] { (Environment.SpecialFolder.ApplicationData, "%APPDATA%"), (Environment.SpecialFolder.UserProfile, "%USERPROFILE%") })
         {
             string root = Environment.GetFolderPath(folder);
@@ -47,12 +55,21 @@ internal static class Paths
         return path;
     }
 
-    /// <summary>Writes UTF-8 text without a byte order mark, replacing the file in one step.</summary>
+    /// <summary>
+    /// Writes UTF-8 text without a byte order mark, replacing the file in one step: the text goes to a temporary
+    /// file, which is flushed to the disk before it takes the place of the old one, so a crash or a power cut
+    /// leaves either the old file or the new one, never an empty or half-written file.
+    /// </summary>
     public static void WriteText(string path, string text)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path));
         string temp = path + ".tmp";
-        File.WriteAllText(temp, text, new System.Text.UTF8Encoding(false));
+        using (var fs = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None))
+        {
+            byte[] bytes = new System.Text.UTF8Encoding(false).GetBytes(text);
+            fs.Write(bytes);
+            fs.Flush(true);
+        }
         File.Move(temp, path, true);
     }
 }
@@ -69,6 +86,8 @@ internal sealed class Settings
     /// <summary>SSH destination: user@host, or a Host name from ~/.ssh/config.</summary>
     public string SshHost { get; set; }
     public double[] Window { get; set; }
+    /// <summary>The main window was maximized when it closed (Window keeps its normal bounds).</summary>
+    public bool Maximized { get; set; }
     /// <summary>"auto" (as Windows), "light" or "dark" (the default).</summary>
     public string Appearance { get; set; }
     /// <summary>Key of the accent colour (Theme.Accents); green when unset.</summary>
@@ -82,7 +101,8 @@ internal sealed class Settings
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
 
-    /// <summary>Reads settings.json. On a first start, the language comes from the setup program, or English.</summary>
+    /// <summary>Reads settings.json. On a first start, the language comes from the setup program or, without one,
+    /// from Windows (Spanish or Japanese; English otherwise).</summary>
     public static void Load()
     {
         try
@@ -96,7 +116,7 @@ internal sealed class Settings
             try { Current.Language = Registry.LocalMachine.OpenSubKey(@"Software\Citadel")?.GetValue("Language") as string; }
             catch { }
         }
-        Loc.Current = Loc.FromCode(Current.Language);
+        Loc.Current = string.IsNullOrEmpty(Current.Language) ? Loc.FromWindows() : Loc.FromCode(Current.Language);
     }
 
     public void Save()
@@ -127,10 +147,12 @@ internal static class Rules
         if (!File.Exists(Paths.Rules)) Paths.WriteText(Paths.Rules, DefaultText);
     }
 
+    /// <summary>The rules file; the default rules if it cannot be read. Tests and screenshots never create it.</summary>
     public static string Load()
     {
         try
         {
+            if (!File.Exists(Paths.Rules) && !Settings.Current.Persist) return DefaultText;
             EnsureExists();
             return File.ReadAllText(Paths.Rules);
         }
@@ -143,14 +165,25 @@ internal static class Rules
 /// <summary>Small text helpers shared by the memory search and the conversation search.</summary>
 internal static class Text
 {
-    /// <summary>Lowercase, without accents.</summary>
+    /// <summary>Lowercase, without accents. Text that cannot be normalized (a lone surrogate) is only lowercased.</summary>
     public static string Fold(string s)
     {
+        string decomposed;
+        try { decomposed = s.Normalize(System.Text.NormalizationForm.FormD); }
+        catch (ArgumentException) { return s.ToLowerInvariant(); }
         var sb = new System.Text.StringBuilder();
-        foreach (char c in s.Normalize(System.Text.NormalizationForm.FormD))
+        foreach (char c in decomposed)
             if (System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark)
                 sb.Append(char.ToLowerInvariant(c));
         return sb.ToString().Normalize(System.Text.NormalizationForm.FormC);
+    }
+
+    /// <summary>The first <paramref name="length"/> characters at most, without splitting a surrogate pair.</summary>
+    public static string Cut(string s, int length)
+    {
+        if (s.Length <= length) return s;
+        if (length > 0 && char.IsHighSurrogate(s[length - 1])) length--;
+        return s[..length];
     }
 
     /// <summary>Folded words made of letters and digits.</summary>

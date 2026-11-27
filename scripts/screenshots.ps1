@@ -11,22 +11,22 @@
 #  It is distributed WITHOUT ANY WARRANTY. See the LICENSE file for details.
 #
 
-# Renders the main window, a search, the welcome screen, the memory preview, Settings, About and two pages of the
-# setup window, in English and Spanish, to docs\images\ for the manuals. It uses the --screenshot option
-# of each program: the windows are drawn to files and the programs exit by themselves.
+# Renders the main window, a search, the welcome screen, the memory preview, Settings (Memories and Appearance
+# tabs), About and two pages of the setup window, in English, Spanish and Japanese, to docs\images\ for the
+# manuals. It uses the --screenshot option of each program: the windows are drawn to files and the programs exit
+# by themselves.
 #
-# -Demo points to a folder with "en" and "es" subfolders, each holding "conversations" and "memories",
-# which are shown in the images. They are copied to %APPDATA%\Citadel for the run, so the images show
-# the real default paths, and that folder is deleted afterwards. To protect real data, the script stops
-# if %APPDATA%\Citadel already exists. Ollama must be running (the memory preview asks the model for a
-# real draft). Requires the .NET 10 SDK.
+# -Demo points to a folder with "en", "es" and "ja" subfolders, each holding "conversations" and "memories",
+# which are shown in the images. They are copied to a temporary folder that Citadel uses through --data-folder,
+# and that folder is deleted afterwards: %APPDATA%\Citadel, where the real conversations live, is never read or
+# touched; the images still show the paths as %APPDATA%\Citadel, as in a real installation. Ollama must be
+# running (the memory preview asks the model for a real draft). Requires the .NET 10 SDK.
 
 param([Parameter(Mandatory)][string]$Demo)
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
-$data = Join-Path $env:APPDATA 'Citadel'
-if (Test-Path $data) { throw "$data exists; this script only runs where Citadel has no data of its own." }
+$data = Join-Path ([IO.Path]::GetTempPath()) "citadel-screenshots-$PID"
 $app = Join-Path $root 'build\screenshots\app'
 $setup = Join-Path $root 'build\screenshots\setup'
 dotnet build (Join-Path $root 'src\Citadel\Citadel.csproj') -c Release -o $app
@@ -44,21 +44,24 @@ function Render([string]$exe, [string]$png, [string[]]$arguments) {
 }
 
 try {
-    foreach ($language in 'en', 'es') {
+    foreach ($language in 'en', 'es', 'ja') {
         if (Test-Path $data) { Remove-Item $data -Recurse -Force }
         New-Item -ItemType Directory -Force (Join-Path $data 'conversations'), (Join-Path $data 'memories') | Out-Null
         Copy-Item (Join-Path $Demo "$language\conversations\*.json") (Join-Path $data 'conversations')
         Copy-Item (Join-Path $Demo "$language\memories\*") (Join-Path $data 'memories')
         $exe = Join-Path $app 'Citadel.exe'
+        $common = @('--data-folder', "`"$data`"", '--language', $language)
         foreach ($window in 'main', 'settings', 'about', 'save') {
             $name = if ($window -eq 'main') { 'chat' } else { $window }
-            Render $exe (Join-Path $images "$name-$language.png") @('--window', $window, '--language', $language)
+            Render $exe (Join-Path $images "$name-$language.png") (@('--window', $window) + $common)
         }
+        # The Appearance tab of Settings (tab 3).
+        Render $exe (Join-Path $images "appearance-$language.png") (@('--window', 'settings', '--tab', '3') + $common)
         # A search in the text of the demonstration conversations.
-        $query = @{ en = 'list'; es = 'lista' }[$language]
-        Render $exe (Join-Path $images "search-$language.png") @('--window', 'main', '--language', $language, '--search', $query)
+        $query = @{ en = 'list'; es = 'lista'; ja = 'リスト' }[$language]
+        Render $exe (Join-Path $images "search-$language.png") (@('--window', 'main', '--search', $query) + $common)
         Remove-Item (Join-Path $data 'conversations\*.json')
-        Render $exe (Join-Path $images "welcome-$language.png") @('--window', 'main', '--language', $language)
+        Render $exe (Join-Path $images "welcome-$language.png") (@('--window', 'main') + $common)
         foreach ($page in 'install', 'uninstall') {
             Render (Join-Path $setup 'CitadelSetup.exe') (Join-Path $images "setup-$page-$language.png") @('--page', $page, '--language', $language)
         }

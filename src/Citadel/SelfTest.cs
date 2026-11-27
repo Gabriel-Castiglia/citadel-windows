@@ -11,6 +11,9 @@
 //  It is distributed WITHOUT ANY WARRANTY. See the LICENSE file for details.
 //
 
+using System.Reflection;
+using System.Reflection.Emit;
+using System.Text.RegularExpressions;
 using System.Windows.Media;
 
 namespace Citadel;
@@ -19,8 +22,9 @@ namespace Citadel;
 /// End-to-end check driven through the same ChatModel the window uses:
 ///   Citadel.exe --self-test --memory-folder &lt;empty folder&gt; [--data-folder &lt;folder&gt;]
 ///   Citadel.exe --self-test --offline      (only the checks that need no Ollama)
-/// Nothing is written to the conversations folder; memories go only to the given folder. The search,
-/// export and update checks run first, need no Ollama, and use made-up conversations in a temporary folder.
+/// Nothing is written to the conversations folder; memories go only to the given folder. The interface texts,
+/// search, export, attachment and update checks run first, need no Ollama, and use made-up conversations in a
+/// temporary folder.
 /// </summary>
 internal static class SelfTest
 {
@@ -184,9 +188,11 @@ internal static class SelfTest
 
     private static ChatMessage Msg(Role role, string content, DateTime date) => new() { Role = role, Content = content, Date = date };
 
-    /// <summary>Search, Markdown export and the pure parts of the updates. No Ollama, no network, no real data.</summary>
+    /// <summary>Interface texts, search, Markdown export, attachments and the pure parts of the updates. No Ollama, no network, no real data.</summary>
     private static async Task OfflineChecks()
     {
+        InterfaceTextChecks();
+        StreamAndFileChecks();
         string temp = Path.Combine(Path.GetTempPath(), "citadel-selftest-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(temp);
         Say("temporary folder: " + temp);
@@ -279,10 +285,21 @@ internal static class SelfTest
             string es = MarkdownExport.Render(conv, UiLanguage.Es, TimeZoneInfo.Utc, "1.3.0");
             Check(es.Contains("\n## Usuario\n") && es.Contains("\n## Asistente\n") && es.Contains("- Fecha: 2026-11-20 09:00\n") && es.EndsWith("_detenida_\n"),
                   "export: Spanish headings and labels");
+            string ja = MarkdownExport.Render(conv, UiLanguage.Ja, TimeZoneInfo.Utc, "1.3.0");
+            Check(ja.Contains("\n## ユーザー\n") && ja.Contains("\n## アシスタント\n") && ja.Contains("- 日付: 2026-11-20 09:00\n") && ja.EndsWith("_停止_\n"),
+                  "export: Japanese headings and labels");
             Check(MarkdownExport.FileName(new Conversation { Title = "a/b: c?" }) == "a-b- c.md" && MarkdownExport.FileName(new Conversation()) == "Citadel.md",
                   "export: file name without forbidden characters");
             Check(MarkdownExport.CloseFences("text\n```cs\nx\n```") == "text\n```cs\nx\n```" && MarkdownExport.CloseFences("```\nx") == "```\nx\n```",
                   "export: a code block left open is closed, a closed one is left alone");
+            Check(MarkdownExport.FileName(new Conversation { Title = "con" }) == "Citadel - con.md" && MarkdownExport.FileName(new Conversation { Title = "Nul.txt" }) == "Citadel - Nul.txt.md",
+                  "export: a name Windows reserves for a device gets a prefix");
+
+            // Unicode: titles are never cut inside a surrogate pair, and folding survives a lone surrogate.
+            string emojiTitle = Conversation.TitleFrom(new string('x', 59) + "\U0001F600 tail");
+            Check(emojiTitle == new string('x', 59) + "…" && Text.Fold("A\uD83D") == "a\uD83D",
+                  "unicode: a title is cut before an emoji, not inside it; a lone surrogate does not break the search");
+            Check(ConversationSearch.Find(loaded, "eco", 5, 3).Count == 3, "search: the total limit is exact");
 
             // Updates: version comparison, SHA256SUMS.txt, the release answer and the check of the download.
             Check(MainWindow.IsNewer("v1.3.0", "1.2.0") && MainWindow.IsNewer("1.10.0", "1.9.0") && !MainWindow.IsNewer("v1.2.0", "1.2.0")
@@ -327,5 +344,146 @@ internal static class SelfTest
         {
             try { Directory.Delete(temp, true); } catch { }
         }
+    }
+
+    /// <summary>
+    /// The three interface languages: every call to Loc.tr in the compiled program gives the Spanish, English and
+    /// Japanese texts as literals, none of them empty, with the same markers in the three (format items such as
+    /// {0}, line breaks, spaces at the ends, and the commands, keys, paths and files the text names).
+    /// </summary>
+    private static void InterfaceTextChecks()
+    {
+        Check(Loc.All.Length == 3 && Loc.All.All(l => Loc.FromCode(Loc.Code(l)) == l) && Loc.All.Select(Loc.NativeName).Distinct().Count() == 3
+              && Loc.FromCode("JA") == UiLanguage.Ja && Loc.FromCode("fr") == UiLanguage.En && Loc.FromCode(null) == UiLanguage.En,
+              "languages: English, Spanish and Japanese, each with its code and its name");
+        var saved = Loc.Current;
+        var names = new List<string>();
+        foreach (var l in Loc.All) { Loc.Current = l; names.Add(Loc.tr("a", "b", "c") + Loc.tr("{0}-es", "{0}-en", "{0}-ja", 7)); }
+        Loc.Current = saved;
+        Check(names.SequenceEqual(["b7-en", "a7-es", "c7-ja"]), "languages: tr picks the text of the current language and fills its markers");
+
+        var (calls, problems) = AuditTexts(typeof(Loc).Assembly);
+        foreach (string p in problems.Take(20)) Say("      " + p);
+        Check(calls >= 150 && problems.Count == 0, $"languages: {calls} interface texts, each with the same markers in Spanish, English and Japanese ({problems.Count} problems)");
+    }
+
+    /// <summary>Text markers that must be the same in the three languages.</summary>
+    private static readonly Regex Marker = new(
+        @"\{\d+(?:[,:][^}]*)?\}|(?<![\w.~/])/(?:mem|save)\b|%\w+%|\d+(?:\.\d+){2,}(?::\d+)?|\b[\w-]*\.(?:md|txt|exe)\b|\b(?:Ctrl|Shift)\+\w+|~/[\w./]+|ollama serve",
+        RegexOptions.CultureInvariant);
+
+    /// <summary>The markers of a text. Japanese needs no space after its full stop (。) before the next sentence,
+    /// so there it counts as the space at the end when the other two languages have one.</summary>
+    private static string Markers(string s, bool japanese = false)
+    {
+        var list = Marker.Matches(s).Select(m => m.Value).Order(StringComparer.Ordinal).ToList();
+        list.Add("lines=" + s.Count(c => c == '\n'));
+        list.Add("start=" + (s.Length > 0 && char.IsWhiteSpace(s[0])));
+        list.Add("end=" + (s.Length > 0 && (char.IsWhiteSpace(s[^1]) || (japanese && s[^1] == '。'))));
+        return string.Join(" | ", list);
+    }
+
+    /// <summary>Reads the code of every method and finds the calls to the two Loc.tr overloads with their literals.</summary>
+    private static (int calls, List<string> problems) AuditTexts(Assembly assembly)
+    {
+        var one = new Dictionary<short, OpCode>();
+        foreach (var f in typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static))
+            if (f.GetValue(null) is OpCode op) one[op.Value] = op;
+        var tr3 = typeof(Loc).GetMethod(nameof(Loc.tr), [typeof(string), typeof(string), typeof(string)]);
+        var trN = typeof(Loc).GetMethod(nameof(Loc.tr), [typeof(string), typeof(string), typeof(string), typeof(object[])]);
+        int calls = 0;
+        var problems = new List<string>();
+        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+        foreach (var type in assembly.GetTypes().Where(t => t != typeof(Loc)))
+        {
+            foreach (var method in type.GetMethods(all).Cast<MethodBase>().Concat(type.GetConstructors(all)))
+            {
+                byte[] il;
+                try { il = method.GetMethodBody()?.GetILAsByteArray(); } catch { il = null; }
+                if (il == null) continue;
+                // Decode the instructions: opcode and, for ldstr and calls, the metadata token.
+                var code = new List<(OpCode op, int token)>();
+                for (int i = 0; i < il.Length;)
+                {
+                    short value = il[i] == 0xFE ? (short)(0xFE00 | il[i + 1]) : il[i];
+                    i += il[i] == 0xFE ? 2 : 1;
+                    if (!one.TryGetValue(value, out var op)) { problems.Add($"{type.Name}.{method.Name}: unknown opcode {value:X}"); break; }
+                    int token = 0, size = op.OperandType switch
+                    {
+                        OperandType.InlineNone => 0,
+                        OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
+                        OperandType.InlineVar => 2,
+                        OperandType.InlineI8 or OperandType.InlineR => 8,
+                        OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(il, i),
+                        _ => 4,
+                    };
+                    if (size == 4) token = BitConverter.ToInt32(il, i);
+                    code.Add((op, token));
+                    i += size;
+                }
+                for (int k = 0; k < code.Count; k++)
+                {
+                    if (code[k].op != OpCodes.Call) continue;
+                    MethodBase target;
+                    try { target = method.Module.ResolveMethod(code[k].token, type.IsGenericType ? type.GetGenericArguments() : null, method.IsGenericMethod ? method.GetGenericArguments() : null); }
+                    catch { continue; }
+                    int first;
+                    if (target == tr3) first = k - 3;
+                    else if (target == trN)
+                    {
+                        // The three literals come right before the array of values: ldstr x3, ldc.i4, newarr.
+                        first = -1;
+                        for (int j = k - 5; j >= 0; j--)
+                            if (code[j + 3].op.Name.StartsWith("ldc.i4") && code[j + 4].op == OpCodes.Newarr) { first = j; break; }
+                    }
+                    else continue;
+                    calls++;
+                    string where = $"{type.Name}.{method.Name}";
+                    if (first < 0 || Enumerable.Range(first, 3).Any(j => code[j].op != OpCodes.Ldstr))
+                    {
+                        problems.Add(where + ": a call to tr without three literal texts");
+                        continue;
+                    }
+                    string es = method.Module.ResolveString(code[first].token), en = method.Module.ResolveString(code[first + 1].token),
+                           ja = method.Module.ResolveString(code[first + 2].token);
+                    if (es.Length == 0 || en.Length == 0 || ja.Length == 0) problems.Add($"{where}: an empty text (\"{en}\")");
+                    else if (Markers(es) != Markers(en) || Markers(ja, en.EndsWith(' ')) != Markers(en))
+                        problems.Add($"{where}: different markers in \"{en}\": es [{Markers(es)}] en [{Markers(en)}] ja [{Markers(ja, en.EndsWith(' '))}]");
+                }
+            }
+        }
+        return (calls, problems);
+    }
+
+    /// <summary>The &lt;think&gt; tags split across pieces of the stream, and the encodings of attached files.</summary>
+    private static void StreamAndFileChecks()
+    {
+        (string, string) Run(params string[] pieces)
+        {
+            var tags = new ThinkTags();
+            string thinking = "", content = "";
+            foreach (string p in pieces) { var (t, c) = tags.Feed(p); thinking += t; content += c; }
+            var (rt, rc) = tags.Flush();
+            return (thinking + rt, content + rc);
+        }
+        Check(Run("<think>plan</think>Hello") == ("plan", "Hello") && Run("<thi", "nk>pl", "an</th", "ink>Hel", "lo") == ("plan", "Hello")
+              && Run("<", "think", ">a", "<", "/", "think", ">b") == ("a", "b"),
+              "think tags: found whole or split across pieces of the stream");
+        Check(Run("x < y and a <th") == ("", "x < y and a <th") && Run("<think>still thinking</thi") == ("still thinking</thi", "")
+              && Run("no tags at all") == ("", "no tags at all"),
+              "think tags: a partial tag left at the end is ordinary text");
+
+        byte[] Bytes(System.Text.Encoding e, string s, bool bom) => [.. (bom ? e.GetPreamble() : []), .. e.GetBytes(s)];
+        const string sample = "año, 日本語, ü";
+        bool boms = TextFiles.Decode(Bytes(new System.Text.UTF8Encoding(true), sample, true)) == sample
+                    && TextFiles.Decode(Bytes(System.Text.Encoding.Unicode, sample, true)) == sample
+                    && TextFiles.Decode(Bytes(System.Text.Encoding.BigEndianUnicode, sample, true)) == sample
+                    && TextFiles.Decode(Bytes(System.Text.Encoding.UTF32, sample, true)) == sample
+                    && TextFiles.Decode(Bytes(new System.Text.UTF8Encoding(false), sample, false)) == sample;
+        byte[] latin = [0x61, 0xF1, 0x6F, 0x20, 0xE9];   // "año é" in Windows-1252 / Latin-1: not valid UTF-8
+        string ansi = TextFiles.Decode(latin);
+        Check(boms && ansi == TextFiles.AnsiEncoding().GetString(latin) && TextFiles.Decode([]) == "",
+              $"attachments: byte order marks, UTF-8 and the Windows ANSI code page ({TextFiles.AnsiEncoding().WebName}: \"{ansi}\")");
+        Check(TextFiles.MaxBytes == 2 * 1024 * 1024, "attachments: at most 2 MB per file");
     }
 }

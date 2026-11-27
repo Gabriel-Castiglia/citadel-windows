@@ -2,6 +2,57 @@
 
 All notable changes to Citadel for Windows. Versions follow [semantic versioning](https://semver.org): major.minor.patch.
 
+English · [Español](CHANGELOG.es.md) · [日本語](CHANGELOG.ja.md)
+
+## 1.4.0 - 2026-11-27
+### Added
+
+- **Japanese interface**: Citadel and its setup window are now in English, Spanish and Japanese. Japanese text
+  uses the Japanese fonts of Windows (Yu Gothic UI, or Meiryo UI).
+- The interface language can also be chosen in Settings → Appearance, under "Idioma / Language / 言語".
+- Starting Citadel while it is already open brings its window to the front (restored if it was minimized),
+  instead of doing nothing.
+- The window opens maximized if it was maximized when Citadel closed.
+- Every button, including the icon buttons (new conversation, Settings, About, export, language, Reason,
+  send, Copy, the reasoning block, the colours), can be reached with Tab and pressed with Space or Enter; the
+  one with the focus has a ring in the accent colour. A click with the mouse still leaves the focus in the
+  text box.
+- Links in answers show their address when you point at them.
+- Icon-only buttons (new conversation, About, export, language, send and stop, Reason, Copy, delete) have names
+  that screen readers such as Narrator read aloud.
+- The installation also leaves `README.ja.txt`, the Japanese README, in the program folder.
+- README, PDF manual and changelog in Japanese, and the changelog in Spanish.
+
+### Changed
+
+- Without a language chosen in the setup (the stand-alone `Citadel.exe`), the first start uses the language of
+  Windows when it is Spanish or Japanese, instead of always English.
+- An attachment can be at most 2 MB; a larger file is refused with a message. The text of an attachment is read
+  in its own encoding (byte order mark, UTF-8, or the Windows code page for non-Unicode programs), so a file that
+  is not UTF-8 no longer shows broken characters.
+- `scripts\build.ps1` no longer writes `dist\SHA256SUMS.txt`: the hashes and their signature (`release.sig`)
+  are computed and published separately when a version is released.
+- `--screenshot` shows the paths of the folder given with `--data-folder` as `%APPDATA%\Citadel`, so the images
+  of the manuals show the real path.
+- `--self-test` also checks that every interface text is in the three languages with the same markers, the
+  `<think>` tags split across pieces of an answer and the encodings of attachments.
+- Conversations, settings, rules and memories are written to disk completely before they replace the old file,
+  so a power cut can no longer leave an empty file.
+
+### Fixed
+
+- Changing the language or the theme with Settings open discarded rules being edited and not yet saved.
+- A `<think>` tag that arrived split between two pieces of an answer was shown as text and the reasoning was
+  mixed with the answer.
+- A conversation deleted while its answer was being written came back on the next start; its answer now stops.
+- A link with an invalid address could stop an answer from being drawn; it is now shown as plain text.
+- Exporting a conversation whose title is a name Windows reserves (CON, NUL, COM1…) now saves it as
+  "Citadel - <title>.md", and a long title with emoji is no longer cut in the middle of a character.
+- With Ollama or the SSH computer unreachable, the status checks no longer pile up.
+- An answer from Ollama that cannot be read (for example from another program on its port) now gives the message
+  "Ollama returned an answer that cannot be read." instead of a technical error.
+- The search in the messages shows at most 200 results, as intended (it could show 201).
+
 ## 1.3.2 - 2026-11-27
 
 ### Changed

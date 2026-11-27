@@ -71,7 +71,7 @@ internal sealed partial class MainWindow
         if (!Settings.Current.Persist) return;   // self-test and screenshots: never
         RestoreDraft();
         if (Environment.GetCommandLineArgs().Contains("--updated"))
-            Loaded += (s, e) => ShowToast(tr($"Citadel se actualizó a la versión {AboutWindow.VersionText}.", $"Citadel was updated to version {AboutWindow.VersionText}."));
+            Loaded += (s, e) => ShowToast(tr("Citadel se actualizó a la versión {0}.", "Citadel was updated to version {0}.", "Citadel をバージョン {0} に更新しました。", AboutWindow.VersionText));
         Loaded += async (s, e) =>
         {
             await Task.Delay(TimeSpan.FromSeconds(8));
@@ -167,7 +167,7 @@ internal sealed partial class MainWindow
         return http;
     }
 
-    private void Info(string message) => Dialogs.Choose(this, "Citadel", message, [tr("Aceptar", "OK")], 0);
+    private void Info(string message) => Dialogs.Choose(this, "Citadel", message, [tr("Aceptar", "OK", "OK")], 0);
 
     /// <summary>Looks for a newer release; <paramref name="interactive"/> when asked from the About window.</summary>
     public async Task CheckUpdatesAsync(bool interactive)
@@ -183,28 +183,30 @@ internal sealed partial class MainWindow
                 release = ParseRelease(await http.GetStringAsync($"https://api.github.com/repos/{UpdateRepo}/releases/latest"));
             if (!IsNewer(release.Tag, mine))
             {
-                if (interactive) Info(tr($"Citadel {mine} es la versión más reciente.", $"Citadel {mine} is the latest version."));
+                if (interactive) Info(tr("Citadel {0} es la versión más reciente.", "Citadel {0} is the latest version.", "Citadel {0} は最新バージョンです。", mine));
                 return;
             }
             // A window that is busy with a dialog of its own is not interrupted by the daily check.
             if (!interactive && OwnedWindows.Cast<Window>().Any(w => w is MemoryPreviewWindow)) return;
-            string title = tr($"Hay una versión nueva de Citadel: {release.Tag}", $"A new version of Citadel is available: {release.Tag}");
+            string title = tr("Hay una versión nueva de Citadel: {0}", "A new version of Citadel is available: {0}", "Citadel の新しいバージョンがあります: {0}", release.Tag);
             if (!IsInstalledCopy() || release.SetupUrl == null || release.SumsUrl == null || release.SigUrl == null)
             {
                 // A stand-alone Citadel.exe, or a release without its setup or its hashes: only the page.
                 string why = IsInstalledCopy()
-                    ? tr("Esta versión no trae el instalador para actualizar sola.", "This release does not include the setup needed to update by itself.")
+                    ? tr("Esta versión no trae el instalador para actualizar sola.", "This release does not include the setup needed to update by itself.", "このリリースには、自動で更新するためのセットアップが含まれていません。")
                     : tr("Este Citadel.exe no está instalado, así que no puede actualizarse solo: descarga la versión nueva desde su página.",
-                         "This Citadel.exe is not installed, so it cannot update itself: download the new version from its page.");
-                if (Dialogs.Choose(this, title, tr($"Tienes la {mine}. ", $"You have {mine}. ") + why,
-                                   [tr("Más tarde", "Later"), tr("Abrir la página", "Open the page")], 1) == 1 && release.Page != null)
+                         "This Citadel.exe is not installed, so it cannot update itself: download the new version from its page.",
+                         "この Citadel.exe はインストールされていないため、自動では更新できません。新しいバージョンはリリース ページからダウンロードしてください。");
+                if (Dialogs.Choose(this, title, tr("Tienes la {0}. ", "You have {0}. ", "現在のバージョンは {0} です。", mine) + why,
+                                   [tr("Más tarde", "Later", "後で"), tr("Abrir la página", "Open the page", "ページを開く")], 1) == 1 && release.Page != null)
                     OpenLink(release.Page);
                 return;
             }
             int r = Dialogs.Choose(this, title,
-                                   tr($"Tienes la {mine}. Citadel puede descargarla, comprobarla, instalarla y volver a abrirse solo. Tus conversaciones se conservan.",
-                                      $"You have {mine}. Citadel can download it, check it, install it and open again by itself. Your conversations are kept."),
-                                   [tr("Más tarde", "Later"), tr("Ver novedades", "What's new"), tr("Actualizar ahora", "Update now")], 2);
+                                   tr("Tienes la {0}. Citadel puede descargarla, comprobarla, instalarla y volver a abrirse solo. Tus conversaciones se conservan.",
+                                      "You have {0}. Citadel can download it, check it, install it and open again by itself. Your conversations are kept.",
+                                      "現在のバージョンは {0} です。Citadel は新しいバージョンのダウンロード、確認、インストールを行い、自動で再起動します。会話はそのまま残ります。", mine),
+                                   [tr("Más tarde", "Later", "後で"), tr("Ver novedades", "What's new", "新機能を見る"), tr("Actualizar ahora", "Update now", "今すぐ更新")], 2);
             if (r == 1 && release.Page != null) { OpenLink(release.Page); return; }
             if (r != 2) return;
             await InstallUpdateAsync(release);
@@ -212,7 +214,7 @@ internal sealed partial class MainWindow
         catch (Exception ex)
         {
             Program.Log("Update check failed: " + ex.Message);
-            if (interactive) Info(tr($"No se pudo buscar actualizaciones: {ex.Message}", $"Could not check for updates: {ex.Message}"));
+            if (interactive) Info(tr("No se pudo buscar actualizaciones: {0}", "Could not check for updates: {0}", "更新を確認できませんでした: {0}", ex.Message));
         }
     }
 
@@ -238,14 +240,15 @@ internal sealed partial class MainWindow
             string file = Path.Combine(UpdateDir, SetupAsset);
             using (var http = NewHttp(TimeSpan.FromMinutes(15)))
             {
-                // the author's signature of the hashes first (ReleaseSignature.cs): without a valid one nothing is
-                // downloaded or run, so a release someone else put on the page never installs itself
+                // The author's signature of the hashes first (ReleaseSignature.cs): without a valid one nothing is
+                // downloaded or run, so a release someone else put on the page never installs itself.
                 byte[] sums = await http.GetByteArrayAsync(release.SumsUrl);
                 if (!ReleaseSignature.Valid(sums, await http.GetStringAsync(release.SigUrl)))
                     throw new InvalidOperationException(tr("La versión publicada no trae una firma válida del autor: no se instaló nada. Se puede bajar a mano desde su página.",
-                                                           "The release does not carry a valid signature of the author: nothing was installed. It can be downloaded by hand from its page."));
+                                                           "The release does not carry a valid signature of the author: nothing was installed. It can be downloaded by hand from its page.",
+                                                           "このリリースには作者の有効な署名がないため、何もインストールしませんでした。リリース ページから手動でダウンロードできます。"));
                 string expected = HashFor(System.Text.Encoding.UTF8.GetString(sums), SetupAsset)
-                    ?? throw new InvalidOperationException(tr($"{SumsAsset} no trae el hash de {SetupAsset}.", $"{SumsAsset} has no hash for {SetupAsset}."));
+                    ?? throw new InvalidOperationException(tr("{0} no trae el hash de {1}.", "{0} has no hash for {1}.", "{0} に {1} のハッシュがありません。", SumsAsset, SetupAsset));
                 using (var resp = await http.GetAsync(release.SetupUrl, HttpCompletionOption.ResponseHeadersRead))
                 {
                     resp.EnsureSuccessStatusCode();
@@ -263,13 +266,14 @@ internal sealed partial class MainWindow
                         {
                             lastPct = pct;
                             string amount = pct >= 0 ? pct + " %" : (done >> 20) + " MB";
-                            SetUpdateNote(tr($"Descargando Citadel {release.Tag}… {amount}", $"Downloading Citadel {release.Tag}… {amount}"));
+                            SetUpdateNote(tr("Descargando Citadel {0}… {1}", "Downloading Citadel {0}… {1}", "Citadel {0} をダウンロードしています… {1}", release.Tag, amount));
                         }
                     }
                 }
                 if (!await VerifyDownload(file, expected))
                     throw new InvalidOperationException(tr("El archivo descargado no coincide con su hash: se borró y no se instaló nada.",
-                                                           "The downloaded file does not match its hash: it was deleted and nothing was installed."));
+                                                           "The downloaded file does not match its hash: it was deleted and nothing was installed.",
+                                                           "ダウンロードしたファイルがハッシュと一致しないため、削除しました。何もインストールしていません。"));
             }
 
             // An answer being written is waited for or stopped (and so saved) before closing.
@@ -286,8 +290,10 @@ internal sealed partial class MainWindow
         {
             Program.Log("Update failed: " + ex.Message);
             try { File.Delete(DraftFile); } catch { }
+            // A download cut halfway (or not verified) is never left behind to be run later.
+            try { File.Delete(Path.Combine(UpdateDir, SetupAsset)); } catch { }
             CancelUpdate();
-            Info(tr($"No se pudo actualizar: {ex.Message}", $"Could not update: {ex.Message}"));
+            Info(tr("No se pudo actualizar: {0}", "Could not update: {0}", "更新できませんでした: {0}", ex.Message));
         }
     }
 
@@ -305,13 +311,14 @@ internal sealed partial class MainWindow
     {
         if (model.IsGenerating || model.IsDraftingMemory)
         {
-            int r = Dialogs.Choose(this, tr("Hay una respuesta en curso", "An answer is being written"),
+            int r = Dialogs.Choose(this, tr("Hay una respuesta en curso", "An answer is being written", "回答を作成中です"),
                                    tr("Citadel se cerrará para instalar la versión nueva. La respuesta se guarda en la conversación tanto si esperas a que termine como si la detienes.",
-                                      "Citadel will close to install the new version. The answer is saved in the conversation whether you wait for it to finish or stop it."),
-                                   [tr("Cancelar", "Cancel"), tr("Detenerla y actualizar", "Stop it and update"), tr("Esperar a que termine", "Wait for it to finish")], 2);
+                                      "Citadel will close to install the new version. The answer is saved in the conversation whether you wait for it to finish or stop it.",
+                                      "新しいバージョンをインストールするため、Citadel を終了します。完了を待っても停止しても、回答は会話に保存されます。"),
+                                   [tr("Cancelar", "Cancel", "キャンセル"), tr("Detenerla y actualizar", "Stop it and update", "停止して更新"), tr("Esperar a que termine", "Wait for it to finish", "完了を待つ")], 2);
             if (r <= 0) return false;
             if (r == 1) model.Stop();
-            else SetUpdateNote(tr("La actualización espera a que termine la respuesta (Esc la detiene)…", "The update waits for the answer to finish (Esc stops it)…"));
+            else SetUpdateNote(tr("La actualización espera a que termine la respuesta (Esc la detiene)…", "The update waits for the answer to finish (Esc stops it)…", "回答が完了してから更新します (Esc で停止)…"));
         }
         // The answer is saved when its stream ends; a memory draft opens its preview, which is finished first.
         while (model.IsGenerating || model.IsDraftingMemory || OwnedWindows.Cast<Window>().Any(w => w is MemoryPreviewWindow))
@@ -320,7 +327,7 @@ internal sealed partial class MainWindow
             await Task.Delay(250);
         }
         if (windowClosed) return false;
-        SetUpdateNote(tr("Instalando la versión nueva…", "Installing the new version…"));
+        SetUpdateNote(tr("Instalando la versión nueva…", "Installing the new version…", "新しいバージョンをインストールしています…"));
         return true;
     }
 

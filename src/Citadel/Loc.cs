@@ -13,11 +13,16 @@
 
 namespace Citadel;
 
-public enum UiLanguage { En, Es }
+public enum UiLanguage { En, Es, Ja }
 
 /// <summary>
-/// Interface language. English is the default on first launch; the choice is stored in the configuration.
-/// Every visible text goes through <see cref="tr"/>, which receives both versions side by side.
+/// Interface language: English, Spanish or Japanese. On the first start it is the one chosen in the setup program;
+/// without one, the language of Windows when it is Spanish or Japanese, otherwise English. After that, the choice
+/// is stored in settings.json.
+/// Every visible text goes through <see cref="tr(string, string, string)"/>, which receives the three versions side
+/// by side as literals (Spanish, English, Japanese); texts with values use numbered markers ({0}, {1}) and the
+/// overload with arguments. The self-test reads every call from the compiled program and checks that the three
+/// versions are there and carry the same markers.
 /// </summary>
 internal static class Loc
 {
@@ -37,13 +42,41 @@ internal static class Loc
         }
     }
 
-    /// <summary>Configuration code of a language ("en" or "es").</summary>
-    public static string Code(UiLanguage l) => l == UiLanguage.Es ? "es" : "en";
+    /// <summary>Every interface language, in the order of the menus.</summary>
+    public static readonly UiLanguage[] All = [UiLanguage.En, UiLanguage.Es, UiLanguage.Ja];
+
+    /// <summary>The label of the language menus, in the three languages so it can be found from any of them.</summary>
+    public const string MenuLabel = "Idioma / Language / 言語";
+
+    /// <summary>Configuration code of a language ("en", "es" or "ja").</summary>
+    public static string Code(UiLanguage l) => l switch { UiLanguage.Es => "es", UiLanguage.Ja => "ja", _ => "en" };
+
+    /// <summary>The name of a language in that language, for the menus.</summary>
+    public static string NativeName(UiLanguage l) => l switch { UiLanguage.Es => "Español", UiLanguage.Ja => "日本語", _ => "English" };
+
+    /// <summary>Culture of the current language, for dates and for the text layout of the windows.</summary>
+    public static string CultureName => current switch { UiLanguage.Es => "es-ES", UiLanguage.Ja => "ja-JP", _ => "en-US" };
 
     /// <summary>Language for a configuration code; anything unknown means English.</summary>
-    public static UiLanguage FromCode(string code) =>
-        string.Equals(code, "es", StringComparison.OrdinalIgnoreCase) ? UiLanguage.Es : UiLanguage.En;
+    public static UiLanguage FromCode(string code) => (code ?? "").Trim().ToLowerInvariant() switch
+    {
+        "es" => UiLanguage.Es,
+        "ja" => UiLanguage.Ja,
+        _ => UiLanguage.En,
+    };
+
+    /// <summary>The language of the Windows interface when Citadel has it, otherwise English.</summary>
+    public static UiLanguage FromWindows() => FromCode(System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName);
 
     /// <summary>Returns the text for the current interface language.</summary>
-    public static string tr(string es, string en) => current == UiLanguage.Es ? es : en;
+    public static string tr(string es, string en, string ja) => current switch
+    {
+        UiLanguage.Es => es,
+        UiLanguage.Ja => ja,
+        _ => en,
+    };
+
+    /// <summary>Returns the text for the current interface language with its markers ({0}, {1}...) filled in.</summary>
+    public static string tr(string es, string en, string ja, params object[] args) =>
+        string.Format(System.Globalization.CultureInfo.CurrentCulture, tr(es, en, ja), args);
 }

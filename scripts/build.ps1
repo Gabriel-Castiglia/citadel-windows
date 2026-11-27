@@ -13,8 +13,11 @@
 #   Citadel.exe        self-contained single-file executable (runs without installation)
 #   LICENSE.txt       the license, next to the executable
 #   citadel.msi        MSI package (silent install: msiexec /i citadel.msi /qn)
-#   citadel-setup.exe  setup program in English and Spanish that contains the MSI
-#   SHA256SUMS.txt     hashes of the three programs; Citadel's updates check the downloaded setup against it
+#   citadel-setup.exe  setup program in English, Spanish and Japanese that contains the MSI
+# This script writes no hashes and signs nothing. When a version is published, SHA256SUMS.txt (the hashes of
+# the three programs, which Citadel's updates check the downloaded setup against) and release.sig (the
+# author's signature of SHA256SUMS.txt, see src\Citadel\ReleaseSignature.cs) are computed and uploaded with
+# the release, separately from this build. Without them, installed copies do not update themselves.
 # Requires the .NET 10 SDK; the WiX Toolset is restored automatically as a NuGet package.
 # The version is read from src\Citadel\Citadel.csproj, the only place where it is set.
 
@@ -39,7 +42,7 @@ if ($LASTEXITCODE) { throw 'App publish failed.' }
 dotnet build (Join-Path $root 'installer\Msi\Citadel.Msi.wixproj') -c Release -o $dist -p:PublishDir=$publish -p:Version=$version
 if ($LASTEXITCODE) { throw 'MSI build failed.' }
 
-# 3) The setup window (English and Spanish), then the setup .exe that carries it and the MSI.
+# 3) The setup window (English, Spanish and Japanese), then the setup .exe that carries it and the MSI.
 $setupUi = Join-Path $root 'build\setupui\'
 dotnet build (Join-Path $root 'installer\SetupUI\CitadelSetup.csproj') -c Release -o $setupUi
 if ($LASTEXITCODE) { throw 'Setup window build failed.' }
@@ -48,10 +51,4 @@ if ($LASTEXITCODE) { throw 'Setup .exe build failed.' }
 
 # 4) The stand-alone executable and its license, next to the installers.
 Copy-Item (Join-Path $publish 'Citadel.exe'), (Join-Path $publish 'LICENSE.txt') $dist
-
-# 5) Their hashes, in the format of sha256sum ("hash  name", LF line endings), to publish with the release.
-$sums = foreach ($name in 'citadel-setup.exe', 'citadel.msi', 'Citadel.exe') {
-    (Get-FileHash (Join-Path $dist $name) -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $name
-}
-[IO.File]::WriteAllText((Join-Path $dist 'SHA256SUMS.txt'), (($sums -join "`n") + "`n"))
 Get-ChildItem $dist -Include *.exe, *.msi, *.txt -Recurse | Select-Object Name, Length

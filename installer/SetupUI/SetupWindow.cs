@@ -1,6 +1,6 @@
 //
 //  SetupWindow.cs
-//  Citadel setup: the setup window, in English and Spanish.
+//  Citadel setup: the setup window, in English, Spanish and Japanese.
 //
 //  Copyright (C) 2026 Gabriel Castiglia. Licensed under the GNU GPL, version 2 only.
 //  Date: November 9, 2026
@@ -58,7 +58,8 @@ internal sealed class SetupWindow : Window
         ResizeMode = ResizeMode.NoResize;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         Background = new SolidColorBrush(Color.FromRgb(0xF6, 0xF7, 0xF9));
-        FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI");
+        // Japanese characters fall back to the Windows Japanese interface fonts.
+        FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI, Yu Gothic UI, Meiryo UI");
         FontSize = 13;
         try { Icon = BitmapFrame.Create(new Uri("pack://application:,,,/citadel.ico")); } catch { }
 
@@ -79,8 +80,9 @@ internal sealed class SetupWindow : Window
 
     private void Redraw()
     {
-        Title = tr("Instalación de Citadel", "Citadel Setup");
-        if (subtitle != null) subtitle.Text = tr("Chat con IA local para Windows  ·  versión ", "Local AI chat for Windows  ·  version ") + Version;
+        Language = System.Windows.Markup.XmlLanguage.GetLanguage(Loc.CultureName);
+        Title = tr("Instalación de Citadel", "Citadel Setup", "Citadel セットアップ");
+        if (subtitle != null) subtitle.Text = tr("Chat con IA local para Windows  ·  versión ", "Local AI chat for Windows  ·  version ", "Windows 用ローカル AI チャット  ·  バージョン ") + Version;
         redraw?.Invoke();
     }
 
@@ -108,14 +110,13 @@ internal sealed class SetupWindow : Window
         Grid.SetColumn(titles, 1);
         grid.Children.Add(titles);
 
-        // The language menu: its label carries both languages, so it can be found from either one.
+        // The language menu: its label carries the three languages, so it can be found from any of them.
         var language = new StackPanel { VerticalAlignment = VerticalAlignment.Top };
-        language.Children.Add(new TextBlock { Text = "Idioma / Language", FontSize = 11.5, Foreground = Brushes.DimGray, Margin = new Thickness(0, 0, 0, 3) });
+        language.Children.Add(new TextBlock { Text = Loc.MenuLabel, FontSize = 11.5, Foreground = Brushes.DimGray, Margin = new Thickness(0, 0, 0, 3) });
         var combo = new ComboBox { Width = 120 };
-        combo.Items.Add("English");
-        combo.Items.Add("Español");
-        combo.SelectedIndex = Loc.Current == UiLanguage.Es ? 1 : 0;
-        combo.SelectionChanged += (s, e) => Loc.Current = combo.SelectedIndex == 1 ? UiLanguage.Es : UiLanguage.En;
+        foreach (var l in Loc.All) combo.Items.Add(Loc.NativeName(l));
+        combo.SelectedIndex = Array.IndexOf(Loc.All, Loc.Current);
+        combo.SelectionChanged += (s, e) => { if (combo.SelectedIndex >= 0) Loc.Current = Loc.All[combo.SelectedIndex]; };
         language.Children.Add(combo);
         Grid.SetColumn(language, 2);
         grid.Children.Add(language);
@@ -132,7 +133,7 @@ internal sealed class SetupWindow : Window
 
     public void ShowLoading() => Show(() =>
     {
-        Body(tr("Revisando este equipo…", "Checking this computer…"));
+        Body(tr("Revisando este equipo…", "Checking this computer…", "このコンピューターを確認しています…"));
         Buttons();
     });
 
@@ -143,45 +144,49 @@ internal sealed class SetupWindow : Window
             case SetupState.Install:
                 Show(() =>
                 {
-                    Body(tr("Citadel se instalará para todos los usuarios en:", "Citadel will be installed for all users in:"),
+                    Body(tr("Citadel se instalará para todos los usuarios en:", "Citadel will be installed for all users in:", "Citadel を、すべてのユーザー向けに次の場所へインストールします:"),
                          InstallFolder, null, LicenseLine());
-                    Buttons((tr("Instalar", "Install"), () => app?.Plan(LaunchAction.Install), true), CancelButton());
+                    Buttons((tr("Instalar", "Install", "インストール"), () => app?.Plan(LaunchAction.Install), true), CancelButton());
                 });
                 break;
             case SetupState.Upgrade:
                 Show(() =>
                 {
                     Body(string.Format(tr("Citadel {0} está instalado. Se actualizará a la versión {1}; las conversaciones y los ajustes de cada usuario se conservan.",
-                                          "Citadel {0} is installed. It will be updated to version {1}; each user's conversations and settings are kept."),
+                                          "Citadel {0} is installed. It will be updated to version {1}; each user's conversations and settings are kept.",
+                                          "Citadel {0} がインストールされています。バージョン {1} に更新します。各ユーザーの会話と設定はそのまま残ります。"),
                                        OlderVersion, Version), null, null, LicenseLine());
-                    Buttons((tr("Actualizar", "Update"), () => app?.Plan(LaunchAction.Install), true), CancelButton());
+                    Buttons((tr("Actualizar", "Update", "更新"), () => app?.Plan(LaunchAction.Install), true), CancelButton());
                 });
                 break;
             case SetupState.Maintenance:
                 Show(() =>
                 {
-                    Body(string.Format(tr("Citadel {0} ya está instalado en este equipo.", "Citadel {0} is already installed on this computer."), Version),
+                    Body(string.Format(tr("Citadel {0} ya está instalado en este equipo.", "Citadel {0} is already installed on this computer.", "Citadel {0} は、このコンピューターにすでにインストールされています。"), Version),
                          null, tr("Reparar vuelve a copiar sus archivos; desinstalar lo quita del equipo.",
-                                  "Repair copies its files again; uninstall removes it from the computer."));
-                    Buttons((tr("Reparar", "Repair"), () => app?.Plan(LaunchAction.Repair), false),
-                            (tr("Desinstalar", "Uninstall"), () => app?.Plan(LaunchAction.Uninstall), false),
+                                  "Repair copies its files again; uninstall removes it from the computer.",
+                                  "修復すると、ファイルをもう一度コピーします。アンインストールすると、コンピューターから削除します。"));
+                    Buttons((tr("Reparar", "Repair", "修復"), () => app?.Plan(LaunchAction.Repair), false),
+                            (tr("Desinstalar", "Uninstall", "アンインストール"), () => app?.Plan(LaunchAction.Uninstall), false),
                             CloseButton(true));
                 });
                 break;
             case SetupState.Uninstall:
                 Show(() =>
                 {
-                    Body(tr("Citadel se quitará de este equipo.", "Citadel will be removed from this computer."), null,
+                    Body(tr("Citadel se quitará de este equipo.", "Citadel will be removed from this computer.", "Citadel をこのコンピューターから削除します。"), null,
                          tr("Las conversaciones, memorias y ajustes de cada usuario (carpeta %APPDATA%\\Citadel) se conservan.",
-                            "Each user's conversations, memories and settings (the %APPDATA%\\Citadel folder) are kept."));
-                    Buttons((tr("Desinstalar", "Uninstall"), () => app?.Plan(LaunchAction.Uninstall), true), CancelButton());
+                            "Each user's conversations, memories and settings (the %APPDATA%\\Citadel folder) are kept.",
+                            "各ユーザーの会話、メモリ、設定 (%APPDATA%\\Citadel フォルダー) はそのまま残ります。"));
+                    Buttons((tr("Desinstalar", "Uninstall", "アンインストール"), () => app?.Plan(LaunchAction.Uninstall), true), CancelButton());
                 });
                 break;
             case SetupState.Newer:
                 Show(() =>
                 {
                     Body(string.Format(tr("Ya está instalada una versión más nueva de Citadel ({0}). Esta versión no se puede instalar encima.",
-                                          "A newer version of Citadel ({0}) is already installed. This version cannot be installed over it."),
+                                          "A newer version of Citadel ({0}) is already installed. This version cannot be installed over it.",
+                                          "より新しいバージョンの Citadel ({0}) がすでにインストールされています。このバージョンを上書きしてインストールすることはできません。"),
                                        NewerVersion));
                     Buttons(CloseButton(true));
                 });
@@ -196,15 +201,15 @@ internal sealed class SetupWindow : Window
         {
             string text = action switch
             {
-                LaunchAction.Uninstall => tr("Desinstalando Citadel…", "Uninstalling Citadel…"),
-                LaunchAction.Repair => tr("Reparando Citadel…", "Repairing Citadel…"),
-                _ => OlderVersion != null ? tr("Actualizando Citadel…", "Updating Citadel…") : tr("Instalando Citadel…", "Installing Citadel…"),
+                LaunchAction.Uninstall => tr("Desinstalando Citadel…", "Uninstalling Citadel…", "Citadel をアンインストールしています…"),
+                LaunchAction.Repair => tr("Reparando Citadel…", "Repairing Citadel…", "Citadel を修復しています…"),
+                _ => OlderVersion != null ? tr("Actualizando Citadel…", "Updating Citadel…", "Citadel を更新しています…") : tr("Instalando Citadel…", "Installing Citadel…", "Citadel をインストールしています…"),
             };
             var panel = BodyPanel(text);
             if (bar.Parent is Panel old) old.Children.Remove(bar);
             panel.Children.Add(bar);
             page.Content = panel;
-            Buttons((tr("Cancelar", "Cancel"), () => { if (app != null) app.Canceled = true; }, false));
+            Buttons((tr("Cancelar", "Cancel", "キャンセル"), () => { if (app != null) app.Canceled = true; }, false));
         });
     }
 
@@ -218,26 +223,26 @@ internal sealed class SetupWindow : Window
         {
             if (canceled)
             {
-                Body(tr("Se canceló. El equipo quedó como estaba.", "Canceled. The computer was left as it was."));
+                Body(tr("Se canceló. El equipo quedó como estaba.", "Canceled. The computer was left as it was.", "キャンセルしました。コンピューターは元の状態のままです。"));
                 Buttons(CloseButton(true));
                 return;
             }
             if (!ok)
             {
-                Body(tr("La operación no se pudo completar.", "The operation could not be completed."),
+                Body(tr("La operación no se pudo completar.", "The operation could not be completed.", "操作を完了できませんでした。"),
                      null, ErrorText ?? app?.LastError);
-                Buttons((tr("Ver registro", "View log"), OpenLog, false), CloseButton(true));
+                Buttons((tr("Ver registro", "View log", "ログを表示"), OpenLog, false), CloseButton(true));
                 return;
             }
             string done = action switch
             {
-                LaunchAction.Uninstall => tr("Citadel se desinstaló.", "Citadel was uninstalled."),
-                LaunchAction.Repair => tr("Citadel quedó reparado.", "Citadel was repaired."),
-                _ => tr("Citadel quedó instalado. Está en el menú Inicio.", "Citadel is installed. It is in the Start menu."),
+                LaunchAction.Uninstall => tr("Citadel se desinstaló.", "Citadel was uninstalled.", "Citadel をアンインストールしました。"),
+                LaunchAction.Repair => tr("Citadel quedó reparado.", "Citadel was repaired.", "Citadel を修復しました。"),
+                _ => tr("Citadel quedó instalado. Está en el menú Inicio.", "Citadel is installed. It is in the Start menu.", "Citadel をインストールしました。スタート メニューから起動できます。"),
             };
-            Body(done, null, restart ? tr("Hay que reiniciar Windows para terminar.", "Windows must be restarted to finish.") : null);
+            Body(done, null, restart ? tr("Hay que reiniciar Windows para terminar.", "Windows must be restarted to finish.", "完了するには Windows の再起動が必要です。") : null);
             if (action == LaunchAction.Install)
-                Buttons((tr("Abrir Citadel", "Open Citadel"), LaunchCitadel, true), CloseButton(false));
+                Buttons((tr("Abrir Citadel", "Open Citadel", "Citadel を開く"), LaunchCitadel, true), CloseButton(false));
             else
                 Buttons(CloseButton(true));
         });
@@ -265,15 +270,15 @@ internal sealed class SetupWindow : Window
 
     private UIElement LicenseLine()
     {
-        var link = new Hyperlink(new Run(tr("Licencia Pública General GNU, versión 2", "GNU General Public License, version 2")))
+        var link = new Hyperlink(new Run(tr("Licencia Pública General GNU, versión 2", "GNU General Public License, version 2", "GNU 一般公衆利用許諾書 バージョン 2")))
         {
             NavigateUri = new Uri(LicenseUrl),
         };
         link.RequestNavigate += (s, e) => Open(LicenseUrl);
         var text = new TextBlock { TextWrapping = TextWrapping.Wrap, Foreground = Brushes.DimGray, Margin = new Thickness(0, 16, 0, 0) };
-        text.Inlines.Add(new Run(tr("Citadel es software libre, bajo la ", "Citadel is free software, under the ")));
+        text.Inlines.Add(new Run(tr("Citadel es software libre, bajo la ", "Citadel is free software, under the ", "Citadel は ")));
         text.Inlines.Add(link);
-        text.Inlines.Add(new Run("."));
+        text.Inlines.Add(new Run(tr(".", ".", " に基づくフリーソフトウェアです。")));
         return text;
     }
 
@@ -288,8 +293,8 @@ internal sealed class SetupWindow : Window
         }
     }
 
-    private (string, Action, bool) CancelButton() => (tr("Cancelar", "Cancel"), Close, false);
-    private (string, Action, bool) CloseButton(bool isDefault) => (tr("Cerrar", "Close"), Close, isDefault);
+    private (string, Action, bool) CancelButton() => (tr("Cancelar", "Cancel", "キャンセル"), Close, false);
+    private (string, Action, bool) CloseButton(bool isDefault) => (tr("Cerrar", "Close", "閉じる"), Close, isDefault);
 
     private void OnClosing(object sender, System.ComponentModel.CancelEventArgs e)
     {
@@ -300,7 +305,7 @@ internal sealed class SetupWindow : Window
         }
         // While installing, closing the window means canceling; the engine rolls the changes back.
         e.Cancel = true;
-        var answer = MessageBox.Show(this, tr("¿Cancelar la operación? Se deshará lo hecho hasta ahora.", "Cancel the operation? What was done so far will be undone."),
+        var answer = MessageBox.Show(this, tr("¿Cancelar la operación? Se deshará lo hecho hasta ahora.", "Cancel the operation? What was done so far will be undone.", "操作をキャンセルしますか? ここまでの変更は元に戻されます。"),
                                      "Citadel", MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (answer == MessageBoxResult.Yes && app != null) app.Canceled = true;
     }

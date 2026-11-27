@@ -80,7 +80,7 @@ internal static class Connection
         try { p = Process.Start(info); }
         catch (Exception ex)
         {
-            LastError = tr("No se pudo ejecutar ssh.exe: ", "Could not run ssh.exe: ") + ex.Message;
+            LastError = tr("No se pudo ejecutar ssh.exe: ", "Could not run ssh.exe: ", "ssh.exe を実行できませんでした: ") + ex.Message;
             throw new OllamaException(LastError) { Unreachable = true };
         }
         Job.Add(p);
@@ -96,8 +96,9 @@ internal static class Connection
             {
                 string text;
                 lock (errors) text = errors.ToString().Trim();
-                LastError = tr($"SSH a {host} falló: ", $"SSH to {host} failed: ") +
-                            (text.Length > 0 ? text.Split('\n')[^1].Trim() : tr("código ", "exit code ") + p.ExitCode);
+                LastError = tr("SSH a {0} falló: ", "SSH to {0} failed: ", "{0} への SSH 接続に失敗しました: ", host) +
+                            (text.Length > 0 ? text.Split('\n')[^1].Trim() : tr("código ", "exit code ", "終了コード ") + p.ExitCode);
+                p.Dispose();
                 throw new OllamaException(LastError) { Unreachable = true };
             }
             if (await Accepts(port))
@@ -108,7 +109,8 @@ internal static class Connection
             await Task.Delay(250);
         }
         try { p.Kill(); } catch { }
-        LastError = tr($"SSH a {host} no respondió en 20 s.", $"SSH to {host} did not answer within 20 s.");
+        p.Dispose();
+        LastError = tr("SSH a {0} no respondió en 20 s.", "SSH to {0} did not answer within 20 s.", "{0} への SSH 接続が 20 秒以内に応答しませんでした。", host);
         throw new OllamaException(LastError) { Unreachable = true };
     }
 

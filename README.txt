@@ -1,9 +1,9 @@
 Citadel for Windows
 ===================
 
-Gabriel Castiglia · November 27, 2026 · version 1.3.2 · GPL-2.0 license
+Gabriel Castiglia · November 27, 2026 · version 1.4.0 · GPL-2.0 license
 
-English · Español (README.es.txt)
+English · Español (README.es.txt) · 日本語 (README.ja.txt)
 
 Repository: https://github.com/Gabriel-Castiglia/citadel-windows
 
@@ -12,12 +12,11 @@ PDF manual: docs/Citadel-manual-en.pdf
 Citadel is a chat app for Windows 10 and 11 that talks to language models running on the same
 computer through Ollama <https://ollama.com>. Nothing you write leaves the computer: the app only
 connects to Ollama at 127.0.0.1:11434, unless you choose to reach Ollama on another computer of
-yours through SSH (see Ollama on another computer (#ollama-on-another-computer)); the only other
-connection is the daily check for a new version on GitHub (see Updates (#updates)), which sends
-nothing of yours. It is written in C# with .NET 10 and WPF, uses the Windows 11 style, dark, light
-or as Windows, in one of twelve colours, and its interface is in English and Spanish. A macOS
-version with the same features lives in its own repository,
-https://github.com/Gabriel-Castiglia/citadel.
+yours through SSH (see Ollama on another computer); the only other connection is the daily check for
+a new version on GitHub (see Updates), which sends nothing of yours. It is written in C# with .NET
+10 and WPF, uses the Windows 11 style, dark, light or as Windows, in one of twelve colours, and its
+interface is in English, Spanish and Japanese. A macOS version with the same features lives in its
+own repository, https://github.com/Gabriel-Castiglia/citadel.
 
 Citadel is a chat window, not an agent. The model cannot open files, run commands or browse the web.
 What it gets is what you type, the text files you attach, a set of rules sent with every request
@@ -29,7 +28,8 @@ Requirements
 - Windows 11, or Windows 10 version 1803 or later, 64-bit.
 
 - Ollama for Windows, from https://ollama.com/download. Its installer leaves it running in the
-  background and starting with Windows. Then download a model, in PowerShell:
+  background and starting with Windows (its llama icon sits in the notification area). Then download
+  a model, in PowerShell:
 
       ollama pull qwen3:8b
 
@@ -52,12 +52,13 @@ There are three ways to get Citadel, all built by scripts\build.ps1 into the dis
 
   File                What it is
   ------------------- --------------------------------------------------------------------------------------------------------
-  citadel-setup.exe   Setup program, in English or Spanish. The usual way to install.
+  citadel-setup.exe   Setup program, in English, Spanish or Japanese. The usual way to install.
   citadel.msi         The same installation as a Windows Installer package, for silent installs: msiexec /i citadel.msi /qn.
   Citadel.exe         The program on its own; it runs without installation from any folder.
 
-The setup program opens a window with a language menu in its top right corner, and every page
-changes language at once. It installs Citadel for all users in C:\Program Files\Citadel, which takes
+The setup program opens a window with a language menu in its top right corner (it starts in the
+language of Windows when that is Spanish or Japanese, otherwise in English), and every page changes
+language at once. It installs Citadel for all users in C:\Program Files\Citadel, which takes
 administrator rights (Windows asks for them when installation starts), and adds Citadel to the Start
 menu. The language chosen in the setup window is the one Citadel uses when it starts for the first
 time.
@@ -69,20 +70,22 @@ version cannot be installed over a newer one.
 Updates
 -------
 
-An installed Citadel looks for a newer version once a day, and About → Check for updates looks at
-once. When there is one, it asks a single question: Update now, What's new (opens the release page)
-or Later. Update now does the rest by itself: it checks that the release's SHA256SUMS.txt carries
-the author's signature (release.sig, checked against two keys built into Citadel; a release without
-a valid one installs nothing and can only be downloaded by hand from its page), downloads
-citadel-setup.exe, checks it against that SHA256SUMS.txt (a file that does not match is deleted and
-never run), closes Citadel, installs the new version in silence with the language chosen when
-Citadel was installed, and opens Citadel again. Windows asks for administrator rights, as in any
-installation. If an answer is being written, Citadel first asks whether to wait for it or stop it,
-so it is saved in its conversation; the text being typed, its attachments and the open conversation
-come back after the restart. If the installation fails or is declined, the previous version opens
-again.
+Citadel looks for a newer version once a day, a few seconds after it starts, and About → Check for
+updates looks at once. When an installed Citadel finds one, it asks a single question: Update now,
+What's new (opens the release page) or Later. Update now does the rest by itself: it checks that the
+release's SHA256SUMS.txt carries the author's signature (release.sig, checked against two keys built
+into Citadel; a release without a valid one installs nothing and can only be downloaded by hand from
+its page), downloads citadel-setup.exe, checks it against that SHA256SUMS.txt (a file that does not
+match is deleted and never run), closes Citadel, installs the new version in silence with the
+language chosen when Citadel was installed, and opens Citadel again. Windows asks for administrator
+rights, as in any installation. If an answer is being written, Citadel first asks whether to wait
+for it or stop it, so it is saved in its conversation; the text being typed, its attachments and the
+open conversation come back after the restart. After the update, a notice at the top of the window
+says "Citadel was updated to version …". If the installation fails or is declined, the previous
+version opens again.
 
-The stand-alone Citadel.exe cannot update itself: it only offers the release page.
+The stand-alone Citadel.exe cannot update itself: when there is a new version it offers Open the
+page or Later.
 
 The files are not signed with a commercial certificate, so the first time Windows SmartScreen may
 show "Windows protected your PC". "More info" → "Run anyway" opens them.
@@ -104,16 +107,21 @@ Using Citadel
 
 Type in the box at the bottom and press Enter to send. Shift+Enter (or Alt+Enter) starts a new line.
 The answer appears as it is written, rendered as Markdown: headings, lists, tables, quotes, bold,
-inline code, and code blocks in a monospaced box with their own Copy button. The whole answer can be
-selected with the mouse. Under each answer are a Copy button for the whole answer, the model, its
-speed in tokens per second and the seconds it took.
+inline code, links, and code blocks in a monospaced box with their own Copy button. A link opens in
+the web browser, and pointing at it shows its address. The whole answer can be selected with the
+mouse. Under each answer are a Copy button for the whole answer, the model, its speed in tokens per
+second and the seconds it took.
+
+Citadel opens one window at a time: starting it again (from the Start menu, for example) brings the
+open window to the front, restored if it was minimized. The window opens where it was closed and
+with the same size, maximized if it was maximized.
 
 Conversations
 -------------
 
 The sidebar lists the conversations, newest first. Ctrl+N or the pencil button starts a new one, and
-its title is the first line of the first message. Right-click a conversation to rename it or delete
-it; deleting asks first and removes its file from disk.
+its title is the first line of the first message. Right-click a conversation for Rename…, Export to
+Markdown… and Delete…; deleting asks first and removes its file from disk, and it cannot be undone.
 
 Search
 ------
@@ -150,7 +158,7 @@ appears.
 
 Ollama gives each model a context window of a few thousand tokens unless the model says otherwise.
 For long conversations or large attachments, create a variant with a bigger window, as in
-Requirements (#requirements), and select it in the list. A larger window needs more memory.
+Requirements, and select it in the list. A larger window needs more memory.
 
 Status
 ------
@@ -168,22 +176,28 @@ is on. The reasoning goes in a dimmed block above the answer. The block stays fo
 latest line while the model thinks, and opens with a click. Reason is slower and much more accurate
 on arithmetic, counting letters or words, logic and dates. Without it, the model answers at once and
 is fine for explanations, writing, translation and code. Reason is only available with models that
-can reason (see Models (#models)).
+can reason (see Models).
 
 With Reason on, an answer may write up to 8,000 tokens; with it off, up to 3,000. See
-Technical notes (#technical-notes) for the measurements behind these choices.
+Technical notes for the measurements behind these choices.
 
 Stop
 ----
 
 While an answer is being written, the send button becomes a Stop button (also Esc). It closes the
-connection and Ollama stops generating; what was written so far stays, marked "Stopped".
+connection and Ollama stops generating; what was written so far stays, marked "Stopped". Esc also
+cancels a memory that /save is still drafting.
 
 Attachments
 -----------
 
 Drag a .txt or .md file onto the text box to attach its text to the next message; a chip shows the
-file name and its length, with a button to remove it.
+file name and its length in characters, with a button to remove it. Several files can be attached to
+one message. Other kinds of file are refused with "Only .txt and .md files can be attached.", and a
+file larger than 2 MB is refused with " is larger than 2 MB and was not attached." The text is read
+in the encoding the file was saved in: the one its byte order mark names, otherwise UTF-8, otherwise
+the Windows code page for non-Unicode programs (such as Windows-1252 or Shift_JIS), so an old file
+from Notepad does not show broken characters.
 
 Memories
 --------
@@ -211,13 +225,17 @@ anything, so the model only drafts the text and the app does the writing and the
 Settings
 --------
 
-The Settings button at the bottom of the sidebar (or Ctrl+,) opens a window with three tabs.
+The Settings button at the bottom of the sidebar (or Ctrl+,) opens a window with four tabs.
 
-  Tab        What it holds
-  ---------- ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  Memories   The memory folder (Choose…, or Default to go back to %APPDATA%\Citadel\memories), the list of memories with their index lines, Open folder, Show in File Explorer for each memory, and Delete, which asks first and removes the file and its index line.
-  Rules      The rules sent at the start of every request, editable. Save (Ctrl+S) writes them; Revert discards the changes; Restore defaults puts back the original rules.
-  Ollama     Where Ollama runs: on this computer, or on another one through SSH (see Ollama on another computer (#ollama-on-another-computer)); the only other connection is the daily check for a new version on GitHub (see Updates (#updates)), which sends nothing of yours. Apply and test connects at once and lists the models found.
+  Tab          What it holds
+  ------------ ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  Memories     The memory folder (Choose…, or Default to go back to %APPDATA%\Citadel\memories), the list of memories with their index lines, Open folder, Show in File Explorer for each memory, and Delete, which asks first and removes the file and its index line.
+  Rules        The rules sent at the start of every request, editable. Save (Ctrl+S) writes them; Revert discards the changes; Restore defaults puts back the original rules.
+  Ollama       Where Ollama runs: on this computer (127.0.0.1:11434), or on another one through SSH (see Ollama on another computer). Apply and test connects at once and lists the models found.
+  Appearance   The interface language (see Language), As Windows, Light or Dark, and the colour of the buttons and the icon (see Theme and colour).
+
+Changing the language or the theme with Settings open redraws the window without losing rules that
+are being edited and not yet saved, or an SSH destination not yet applied.
 
 Any folder can be the memory folder, including one that another tool also uses, as long as it keeps
 the same _index.md format.
@@ -247,11 +265,14 @@ cloud, which it cannot know.
 Language
 --------
 
-The interface is in English and Spanish. The globe button at the top right, next to the model list,
-shows the current language and opens the language menu; the change applies at once and is
-remembered. On its first start Citadel uses the language chosen during setup, or English when it
-runs without installation. The language of the interface does not change the language of the
-answers: the model answers in the language you write in.
+The interface is in English, Spanish and Japanese. The globe button at the top right, next to the
+model list, shows the current language and opens the language menu, and Settings → Appearance has
+the same choice under "Idioma / Language / 言語"; the change applies at once to every open window
+and is remembered. On its first start Citadel uses the language chosen during setup; when it runs
+without installation, the language of Windows if it is Spanish or Japanese, otherwise English.
+Japanese text uses the Japanese fonts of Windows (Yu Gothic UI, or Meiryo UI). The language of the
+interface does not change the language of the answers: the model answers in the language you write
+in.
 
 Theme and colour
 ----------------
@@ -259,8 +280,28 @@ Theme and colour
 Settings → Appearance chooses the look of the window: as Windows (light or dark, like your other
 apps), light or dark, which is the default. Below it, twelve colours change the buttons, the
 selection and the glow behind the citadel in the icon of the window and the taskbar while Citadel is
-open; green is the original. The Start menu and desktop shortcuts keep the green icon. The Mac
-version has the same choices.
+open; green is the original. The Start menu and desktop shortcuts keep the green icon. The change
+applies at once to every open window and is remembered. The Mac version has the same choices.
+
+About
+-----
+
+The ⓘ button at the bottom of the sidebar, next to Settings, opens About Citadel: the version, the
+author, the license and the address of the repository, which opens in the browser. View license
+opens the LICENSE.txt installed with Citadel (or the GNU website when it runs without installation),
+Check for updates looks for a new version at once (see Updates), and Close closes the window.
+
+Privacy
+-------
+
+- Conversations, rules, memories and settings are plain files in %APPDATA%\Citadel (see Files);
+  nothing is sent to a cloud service, and Citadel has no account, analytics or telemetry.
+- Requests go only to Ollama: on this computer, or on another computer of yours through an SSH
+  tunnel.
+- The daily update check asks GitHub for the latest release of Citadel; it sends the version of
+  Citadel and nothing else. An update is installed only if its files carry the author's signature.
+- The model only sees what you type, the files you attach, the rules, the memory index and the
+  memories you load with /mem. It cannot read files, run commands or browse the web.
 
 Ollama on another computer
 --------------------------
@@ -274,8 +315,8 @@ always does.
 
 On the computer that runs the model:
 
-1.  Install Ollama and the models, as in Requirements (#requirements). Ollama only needs to listen
-    on 127.0.0.1, its default.
+1.  Install Ollama and the models, as in Requirements. Ollama only needs to listen on 127.0.0.1, its
+    default.
 
 2.  Turn on the SSH server: on a Mac, System Settings → General → Sharing → Remote Login; on
     Windows, Settings → System → Optional features → OpenSSH Server, then start the sshd service.
@@ -303,28 +344,45 @@ Keyboard
 --------
 
   Keys                     Action
-  ------------------------ -----------------------------
+  ------------------------ ----------------------------------------------------------------------------------------------------------------------------------------------------------------------
   Enter                    Send
   Shift+Enter, Alt+Enter   New line
   Ctrl+N                   New conversation
   Ctrl+F                   Search in the conversations
-  Esc                      Stop the answer
+  Esc                      Stop the answer (or the memory being drafted)
   Ctrl+,                   Settings
   Ctrl+S                   Save the rules (Rules tab)
+  Tab, Shift+Tab           Move between the text boxes, lists and buttons, including the icon buttons; the button with the focus has a ring in the accent colour, and Space or Enter presses it
+
+Troubleshooting
+---------------
+
+  What you see                                                                                                                                                     What to do
+  ---------------------------------------------------------------------------------------------------------------------------------------------------------------- ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  The status line says "Ollama is not reachable at 127.0.0.1:11434. Open it from the Start menu or run: ollama serve" (or a message says "Cannot reach Ollama…")   Ollama is not running. Open Ollama from the Start menu (its icon appears in the notification area), or run ollama serve in PowerShell. Citadel checks again every few seconds and the status line turns to "Ollama connected" by itself.
+  The model list is empty                                                                                                                                          Ollama has no models yet: run ollama pull qwen3:8b (or another model) and open the list again.
+  A model appears with "(no Reason)" and the Reason button is dimmed                                                                                               That model cannot reason. Choose another one, such as Qwen3, to use Reason.
+  Answers are very slow                                                                                                                                            The model is running on the processor, or it does not fit in the memory of the graphics card. Try a smaller model; the first answer after starting also includes the time to load the model.
+  The model forgets the start of a long conversation or of a large attachment                                                                                      Its context window is too small: create a variant with a larger num_ctx, as in Requirements.
+  "SSH to … failed" or "did not answer within 20 s"                                                                                                                Check the destination, that the other computer accepts SSH, and that ssh <destination> works in PowerShell without asking for a password. See Ollama on another computer.
+  /save says "The model did not return valid JSON."                                                                                                                Small models sometimes fail at it; try /save again or with another model. Nothing was written.
+  "Ollama returned an answer that cannot be read."                                                                                                                 What answers at 127.0.0.1:11434 (or through the SSH tunnel) is not Ollama, or is a very old version of it. Close the other program that uses that port, or update Ollama from https://ollama.com/download.
+  Windows SmartScreen says "Windows protected your PC"                                                                                                             "More info" → "Run anyway" (see Updates).
+  Something else fails                                                                                                                                             The details are in %APPDATA%\Citadel\citadel.log.
 
 Files
 -----
 
-  What                                                                                  Where
-  ------------------------------------------------------------------------------------- --------------------------------------------------------------------------
-  Installed program                                                                     C:\Program Files\Citadel, with LICENSE.txt, README.txt and README.es.txt
-  Conversations                                                                         %APPDATA%\Citadel\conversations\, one JSON file each
-  Rules                                                                                 %APPDATA%\Citadel\rules.md
-  Memories (default folder)                                                             %APPDATA%\Citadel\memories\, with _index.md
-  Settings (language, model, Reason, memory folder, SSH destination, window position)   %APPDATA%\Citadel\settings.json
-  Error log, if anything fails                                                          %APPDATA%\Citadel\citadel.log, kept under 512 KB
-  Date of the last update check                                                         %APPDATA%\Citadel\update-check.txt
-  Downloaded update (while it installs)                                                 %TEMP%\CitadelUpdate\
+  What                                                                                                                                                                               Where
+  ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- --------------------------------------------------------------------------------------------
+  Installed program                                                                                                                                                                  C:\Program Files\Citadel, with LICENSE.txt, README.txt, README.es.txt and README.ja.txt
+  Conversations                                                                                                                                                                      %APPDATA%\Citadel\conversations\, one JSON file each
+  Rules                                                                                                                                                                              %APPDATA%\Citadel\rules.md
+  Memories (default folder)                                                                                                                                                          %APPDATA%\Citadel\memories\, with _index.md
+  Settings (language, model, Reason, memory folder, Ollama location and SSH destination, appearance, colour, "Open after exporting", window position and whether it was maximized)   %APPDATA%\Citadel\settings.json
+  Error log, if anything fails                                                                                                                                                       %APPDATA%\Citadel\citadel.log; past 512 KB it becomes citadel.old.log and a new one starts
+  Date of the last update check                                                                                                                                                      %APPDATA%\Citadel\update-check.txt
+  Downloaded update, and the text being typed while it installs                                                                                                                      %TEMP%\CitadelUpdate\
 
 Files are written in UTF-8 without a byte order mark. Conversations are plain JSON in the same
 format as the macOS version, so they can be copied between the two.
@@ -338,10 +396,11 @@ With the .NET 10 SDK <https://dotnet.microsoft.com/download> installed:
     powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 
 The first command builds the program. The second builds everything in dist: the stand-alone
-Citadel.exe, citadel.msi, citadel-setup.exe and SHA256SUMS.txt, which is published with them, signed
-in release.sig, so that updates can check the setup; the WiX Toolset 5 is restored automatically as
-a NuGet package. The version is set in one place, src\Citadel\Citadel.csproj, and the installers and
-the About window read it from there.
+Citadel.exe, citadel.msi and citadel-setup.exe; the WiX Toolset 5 is restored automatically as a
+NuGet package. The script writes no hashes and signs nothing: SHA256SUMS.txt and its signature,
+release.sig, which updates use to check the setup, are computed and published separately when a
+version is released. The version is set in one place, src\Citadel\Citadel.csproj, and the installers
+and the About window read it from there.
 
 The program has two modes for maintenance. Both take --data-folder <folder> to use a folder other
 than %APPDATA%\Citadel, so they never touch real conversations.
@@ -349,32 +408,39 @@ than %APPDATA%\Citadel, so they never touch real conversations.
 - Citadel.exe --self-test --memory-folder <empty folder> runs the main features end to end against
   Ollama and prints one PASS or FAIL line per check: listing the models, an answer with Reason off
   and with Reason on, Stop, /save (file, index line, no byte order mark) and /mem. It refuses to run
-  against a memory folder in use. Before those, and without Ollama, it checks the search, the
-  Markdown export (against the expected file) and the update checks (version comparison,
-  SHA256SUMS.txt, the release answer, a download that does not match), with made-up conversations in
-  a temporary folder; --self-test --offline runs only these. Its output can be read with
+  against a memory folder in use. Before those, and without Ollama, it checks the interface texts
+  (every text of the program, read from the compiled code, is in the three languages with the same
+  markers, such as {0}, commands, keys and file names), <think> tags split across two pieces of an
+  answer, the encodings of attachments, the search, the Markdown export (against the expected file)
+  and the update checks (version comparison, SHA256SUMS.txt, the release answer, a download that
+  does not match), with made-up conversations in a temporary folder; --self-test --offline runs only
+  these. Its output can be read with
   Start-Process Citadel.exe -ArgumentList ... -Wait -NoNewWindow -RedirectStandardOutput out.txt.
-- Citadel.exe --screenshot <file.png> --window main|settings|about|save --language en|es draws one
-  window to an image and exits; --search <text> shows the sidebar with the results of a search.
+- Citadel.exe --screenshot <file.png> --window main|settings|about|save --language en|es|ja draws
+  one window to an image and exits (paths inside --data-folder are shown as %APPDATA%\Citadel, as in
+  a real installation); --search <text> shows the sidebar with the results of a search,
+  --tab 0|1|2|3 opens that tab of Settings, and --appearance auto|light|dark and --accent <colour>
+  (green, gold, purple, sky, ember, red, yellow, teal, blue, pink, black, white) choose the look.
 
 citadel-setup.exe /quiet /norestart /CITADELWAITPID=<pid> /CITADELRELAUNCH=1 is how an update runs
 the setup: it waits for that Citadel process to close before replacing anything, and opens Citadel
 again when it ends.
 
 scripts\screenshots.ps1 -Demo <folder> renders the images in docs\images with demonstration
-conversations and memories, scripts/manual.sh (on macOS, with pandoc and Google Chrome) builds the
-PDF manuals and README.txt and README.es.txt from this file and README.es.md, and
+conversations and memories (in a temporary folder, never in %APPDATA%\Citadel), scripts/manual.sh
+(on macOS or in Git Bash on Windows, with pandoc and Google Chrome) builds the three PDF manuals and
+README.txt, README.es.txt and README.ja.txt from this file, README.es.md and README.ja.md, and
 scripts/make-icon.sh (on macOS) builds src\Citadel\citadel.ico from icon\citadel-1024.png.
 
   Folder              Contents
-  ------------------- ---------------------------------------------------------------------------
+  ------------------- ---------------------------------------------------------------------------------
   src/Citadel         The program.
   installer/Msi       The MSI package (WiX).
-  installer/SetupUI   The setup window, in English and Spanish (.NET Framework 4.7.2, WPF).
+  installer/SetupUI   The setup window, in English, Spanish and Japanese (.NET Framework 4.7.2, WPF).
   installer/Setup     The setup program that carries the setup window and the MSI (WiX bundle).
   scripts             Build, images, icon and manuals.
   icon                The icon, as SVG and as a 1024-pixel PNG.
-  docs                PDF manuals, images and the manual stylesheet.
+  docs                PDF manuals in English, Spanish and Japanese, images and the manual stylesheet.
 
 Technical notes
 ---------------
@@ -387,7 +453,7 @@ Technical notes
 - Answers arrive from /api/chat as one JSON object per line. Stop cancels the request, which closes
   the connection; Ollama then cancels the generation, as its log shows (srv stop: cancel task).
   Models that write their reasoning between <think> tags instead of in the thinking field are
-  handled too.
+  handled too, even when a tag arrives split between two pieces of the answer.
 - On 15 hard questions of counting, arithmetic, logic and dates, asked twice each, Qwen3 8B answered
   9 of 30 correctly without reasoning and 26 of 30 with it. With reasoning, the median answer took
   38 seconds and the slowest 172, on a computer where the model writes about 17 tokens per second.
@@ -407,7 +473,9 @@ Credits
 
 Citadel uses Ollama <https://ollama.com> (MIT license) to run the models, which are downloaded
 separately under their own licenses. Qwen3 is published by the Qwen team under the Apache 2.0
-license. The installers are built with the WiX Toolset <https://wixtoolset.org> (MS-RL license).
+license. Citadel.exe carries the .NET <https://dotnet.microsoft.com> runtime (MIT license). The
+installers are built with the WiX Toolset <https://wixtoolset.org> (MS-RL license), whose library
+for setup windows the setup window uses.
 
 Version history
 ---------------

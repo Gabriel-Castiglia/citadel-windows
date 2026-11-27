@@ -26,22 +26,21 @@ internal static class MarkdownExport
     /// <summary>The Markdown text, with "\n" line endings and a final line break.</summary>
     public static string Render(Conversation c, UiLanguage language, TimeZoneInfo zone, string version)
     {
-        bool es = language == UiLanguage.Es;
-        string T(string s, string e) => es ? s : e;
+        string T(string s, string e, string j) => language switch { UiLanguage.Es => s, UiLanguage.Ja => j, _ => e };
         string Date(DateTime utc) => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), zone)
                                                  .ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
         var md = new System.Text.StringBuilder();
         void Line(string s = "") => md.Append(s).Append('\n');
 
-        string title = c.Title.Length == 0 ? T("Conversación nueva", "New conversation") : c.Title;
+        string title = c.Title.Length == 0 ? T("Conversación nueva", "New conversation", "新しい会話") : c.Title;
         Line("# " + title.Replace('\n', ' ').Trim());
         Line();
         var models = c.Messages.Where(m => m.Role == Role.Assistant && !string.IsNullOrEmpty(m.Stats?.Model))
                                .Select(m => m.Stats.Model).Distinct().ToList();
-        Line($"- {T("Fecha", "Date")}: {Date(c.Created)}");
-        if (c.Updated - c.Created >= TimeSpan.FromMinutes(1)) Line($"- {T("Última actividad", "Last activity")}: {Date(c.Updated)}");
-        Line($"- {(models.Count > 1 ? T("Modelos", "Models") : T("Modelo", "Model"))}: {(models.Count == 0 ? "-" : string.Join(", ", models))}");
-        Line($"- {T("Exportada con", "Exported with")} Citadel {version}");
+        Line($"- {T("Fecha", "Date", "日付")}: {Date(c.Created)}");
+        if (c.Updated - c.Created >= TimeSpan.FromMinutes(1)) Line($"- {T("Última actividad", "Last activity", "最終更新")}: {Date(c.Updated)}");
+        Line($"- {(models.Count > 1 ? T("Modelos", "Models", "モデル") : T("Modelo", "Model", "モデル"))}: {(models.Count == 0 ? "-" : string.Join(", ", models))}");
+        Line($"- {T("Exportada con", "Exported with", "エクスポート元:")} Citadel {version}");
 
         foreach (var m in c.Messages)
         {
@@ -49,22 +48,22 @@ internal static class MarkdownExport
             {
                 case Role.User:
                     Line();
-                    Line("## " + T("Usuario", "User"));
+                    Line("## " + T("Usuario", "User", "ユーザー"));
                     Line();
                     if (m.Content.Length > 0) Line(Normalize(m.Content));
                     foreach (var a in m.Attachments)
                     {
                         if (m.Content.Length > 0 || a != m.Attachments[0]) Line();
-                        Details(md, T("Adjunto: ", "Attachment: ") + a.Name, a.Text);
+                        Details(md, T("Adjunto: ", "Attachment: ", "添付ファイル: ") + a.Name, a.Text);
                     }
                     break;
                 case Role.Assistant:
                     Line();
-                    Line("## " + T("Asistente", "Assistant"));
+                    Line("## " + T("Asistente", "Assistant", "アシスタント"));
                     Line();
                     if (m.Thinking.Trim().Length > 0)
                     {
-                        Details(md, T("Razonamiento", "Reasoning"), m.Thinking);
+                        Details(md, T("Razonamiento", "Reasoning", "推論の過程"), m.Thinking);
                         Line();
                     }
                     if (m.Content.Length > 0) Line(CloseFences(Normalize(m.Content)));
@@ -75,7 +74,7 @@ internal static class MarkdownExport
                         if (s.TokensPerSecond > 0) notes.Add(s.TokensPerSecond.ToString("0.0", CultureInfo.InvariantCulture) + " tok/s");
                         if (s.Seconds > 0) notes.Add(s.Seconds.ToString("0.0", CultureInfo.InvariantCulture) + " s");
                     }
-                    if (m.Stopped) notes.Add(T("detenida", "stopped"));
+                    if (m.Stopped) notes.Add(T("detenida", "stopped", "停止"));
                     if (notes.Count > 0)
                     {
                         if (m.Content.Length > 0) Line();
@@ -84,7 +83,7 @@ internal static class MarkdownExport
                     break;
                 case Role.Memory:
                     Line();
-                    Line($"> {T("Memoria cargada", "Memory loaded")}: `{m.MemoryFile ?? "memory.md"}`");
+                    Line($"> {T("Memoria cargada", "Memory loaded", "読み込んだメモリ")}: `{m.MemoryFile ?? "memory.md"}`");
                     break;
             }
         }
@@ -127,7 +126,15 @@ internal static class MarkdownExport
         var invalid = Path.GetInvalidFileNameChars();
         string name = new(c.Title.Select(ch => invalid.Contains(ch) ? '-' : ch).ToArray());
         name = string.Join(' ', name.Split(' ', StringSplitOptions.RemoveEmptyEntries)).Trim('.', ' ', '-');
-        if (name.Length > 80) name = name[..80].TrimEnd('.', ' ');
+        if (name.Length > 80) name = Text.Cut(name, 80).TrimEnd('.', ' ');
+        // Names Windows reserves for devices (CON, NUL, COM1...) cannot be files, with or without an extension.
+        if (ReservedNames.Contains(name.Split('.')[0].TrimEnd())) name = "Citadel - " + name;
         return (name.Length == 0 ? "Citadel" : name) + ".md";
     }
+
+    private static readonly HashSet<string> ReservedNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    };
 }

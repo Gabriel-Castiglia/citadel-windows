@@ -20,7 +20,7 @@ using static Citadel.Loc;
 
 namespace Citadel;
 
-/// <summary>Settings: the memory folder and its memories, and the rules sent with every request.</summary>
+/// <summary>Settings: the memory folder and its memories, the rules sent with every request, where Ollama runs and the appearance.</summary>
 internal sealed class SettingsWindow : Window
 {
     private TabControl tabs;
@@ -29,6 +29,8 @@ internal sealed class SettingsWindow : Window
     private TextBox rulesBox;
     private Button saveRules, revertRules;
     private bool rulesDirty;
+    private TextBox hostBox;
+    private RadioButton localChoice, remoteChoice;
 
     /// <summary>The chat model, so a new Ollama connection can be tested at once.</summary>
     public ChatModel Model { get; init; }
@@ -61,30 +63,45 @@ internal sealed class SettingsWindow : Window
     /// <summary>Shows the given tab: 0 for Memories, 1 for Rules, 2 for Ollama, 3 for Appearance.</summary>
     public int Tab { set => tabs.SelectedIndex = value; }
 
+    /// <summary>
+    /// Builds the window again (on a change of language or theme). What is being edited and not yet saved (the
+    /// rules, the SSH host) is carried over to the new controls, so a change of language does not lose it.
+    /// </summary>
     private void Build()
     {
-        Title = tr("Ajustes de Citadel", "Citadel Settings");
+        string editedRules = rulesDirty ? rulesBox.Text : null;
+        int rulesCaret = rulesBox?.CaretIndex ?? 0;
+        string editedHost = hostBox?.Text;
+        bool? editedRemote = remoteChoice?.IsChecked;
+        Title = tr("Ajustes de Citadel", "Citadel Settings", "Citadel の設定");
         Theme.Apply(this);
         int selected = tabs?.SelectedIndex ?? 0;
         tabs = new TabControl { Margin = new Thickness(14, 10, 14, 14), Background = Brushes.Transparent, BorderThickness = new Thickness(0) };
-        tabs.Items.Add(new TabItem { Header = tr("Memorias", "Memories"), Content = MemoriesTab() });
-        tabs.Items.Add(new TabItem { Header = tr("Reglas", "Rules"), Content = RulesTab() });
+        tabs.Items.Add(new TabItem { Header = tr("Memorias", "Memories", "メモリ"), Content = MemoriesTab() });
+        tabs.Items.Add(new TabItem { Header = tr("Reglas", "Rules", "ルール"), Content = RulesTab() });
         tabs.Items.Add(new TabItem { Header = "Ollama", Content = OllamaTab() });
-        tabs.Items.Add(new TabItem { Header = tr("Apariencia", "Appearance"), Content = AppearanceTab() });
+        tabs.Items.Add(new TabItem { Header = tr("Apariencia", "Appearance", "外観"), Content = AppearanceTab() });
         tabs.SelectedIndex = selected;
         Content = tabs;
         ReloadMemories();
+        if (editedRules != null)
+        {
+            rulesBox.Text = editedRules;
+            rulesBox.CaretIndex = Math.Min(rulesCaret, editedRules.Length);
+        }
+        if (editedHost != null) hostBox.Text = editedHost;
+        if (editedRemote != null) (editedRemote == true ? remoteChoice : localChoice).IsChecked = true;
     }
 
     private UIElement MemoriesTab()
     {
         var panel = new DockPanel { Margin = new Thickness(6, 14, 6, 6) };
         var top = new StackPanel();
-        top.Children.Add(new TextBlock { Text = tr("Carpeta de memorias", "Memory folder"), FontWeight = FontWeights.SemiBold, FontSize = 13.5 });
+        top.Children.Add(new TextBlock { Text = tr("Carpeta de memorias", "Memory folder", "メモリ フォルダー"), FontWeight = FontWeights.SemiBold, FontSize = 13.5 });
         folderText = new TextBlock { FontFamily = Theme.Mono, FontSize = 12.5, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
-        var choose = new Button { Content = tr("Elegir…", "Choose…"), Padding = new Thickness(12, 4, 12, 4), Margin = new Thickness(8, 0, 0, 0) };
+        var choose = new Button { Content = tr("Elegir…", "Choose…", "選択…"), Padding = new Thickness(12, 4, 12, 4), Margin = new Thickness(8, 0, 0, 0) };
         choose.Click += (s, e) => ChooseFolder();
-        var reset = new Button { Content = tr("Por defecto", "Default"), Padding = new Thickness(12, 4, 12, 4), Margin = new Thickness(8, 0, 0, 0), ToolTip = Paths.Short(Paths.DefaultMemoryFolder) };
+        var reset = new Button { Content = tr("Por defecto", "Default", "既定"), Padding = new Thickness(12, 4, 12, 4), Margin = new Thickness(8, 0, 0, 0), ToolTip = Paths.Short(Paths.DefaultMemoryFolder) };
         reset.Click += (s, e) => { Settings.Current.MemoryFolder = null; Settings.Current.Save(); ReloadMemories(); };
         var folderRow = new DockPanel { Margin = new Thickness(0, 8, 0, 0) };
         var folderButtons = new StackPanel { Orientation = Orientation.Horizontal, Children = { choose, reset } };
@@ -95,12 +112,13 @@ internal sealed class SettingsWindow : Window
         top.Children.Add(new TextBlock
         {
             Text = tr("El índice _index.md de esta carpeta se agrega a cada conversación. La app escribe las memorias (con /save), nunca el modelo.",
-                      "The _index.md of this folder is added to every conversation. The app writes memories (with /save), never the model."),
+                      "The _index.md of this folder is added to every conversation. The app writes memories (with /save), never the model.",
+                      "このフォルダーの _index.md はすべての会話に追加されます。メモリを書くのはアプリ (/save) で、モデルではありません。"),
             FontSize = 12, Foreground = Theme.Secondary, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 0),
         });
         var listHeader = new DockPanel { Margin = new Thickness(0, 16, 0, 8) };
-        var open = Theme.FlatButton(Theme.GlyphFolder, tr("Abrir carpeta", "Open folder"), () => Open(MemoryStore.Folder));
-        var refresh = Theme.FlatButton(Theme.GlyphRefresh, null, ReloadMemories, tr("Actualizar", "Refresh"));
+        var open = Theme.FlatButton(Theme.GlyphFolder, tr("Abrir carpeta", "Open folder", "フォルダーを開く"), () => Open(MemoryStore.Folder));
+        var refresh = Theme.FlatButton(Theme.GlyphRefresh, null, ReloadMemories, tr("Actualizar", "Refresh", "最新の情報に更新"));
         var headerButtons = new StackPanel { Orientation = Orientation.Horizontal, Children = { open, refresh } };
         DockPanel.SetDock(headerButtons, Dock.Right);
         listHeader.Children.Add(headerButtons);
@@ -123,28 +141,41 @@ internal sealed class SettingsWindow : Window
         return panel;
     }
 
-    /// <summary>Appearance (as Windows, light, dark) and the twelve accent colours (Theme.Accents).</summary>
+    /// <summary>A choice button of the Appearance tab: filled with the accent colour when it is the current one.</summary>
+    private static Button Choice(string label, bool on, Action click)
+    {
+        var b = new Button
+        {
+            Content = new TextBlock { Text = label, FontSize = 13, Foreground = on ? Theme.OnAccent : Theme.Text },
+            Background = on ? Theme.Accent : Theme.Card, Template = Theme.FlatTemplate(6),
+            Padding = new Thickness(14, 6, 14, 6), Margin = new Thickness(0, 0, 6, 0), Cursor = System.Windows.Input.Cursors.Hand,
+        };
+        Theme.KeyboardReachable(b, label);
+        b.Click += (s, e) => click();
+        return b;
+    }
+
+    /// <summary>The interface language, the appearance (as Windows, light, dark) and the twelve accent colours (Theme.Accents).</summary>
     private UIElement AppearanceTab()
     {
         var panel = new StackPanel { Margin = new Thickness(6, 14, 6, 6) };
-        panel.Children.Add(new TextBlock { Text = tr("Apariencia", "Appearance"), FontWeight = FontWeights.SemiBold, FontSize = 13.5 });
+        // The heading names the setting in the three languages, so it can be found from any of them.
+        panel.Children.Add(new TextBlock { Text = Loc.MenuLabel, FontWeight = FontWeights.SemiBold, FontSize = 13.5 });
+        var languages = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 18) };
+        foreach (var lang in Loc.All)
+            languages.Children.Add(Choice(Loc.NativeName(lang), Loc.Current == lang, () => MainWindow.SetLanguage(lang)));
+        panel.Children.Add(languages);
+        panel.Children.Add(new TextBlock { Text = tr("Apariencia", "Appearance", "外観"), FontWeight = FontWeights.SemiBold, FontSize = 13.5 });
         var looks = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
-        foreach (var (key, label) in new[] { ("auto", tr("Como Windows", "As Windows")), ("light", tr("Claro", "Light")), ("dark", tr("Oscuro", "Dark")) })
+        foreach (var (key, label) in new[] { ("auto", tr("Como Windows", "As Windows", "Windows に合わせる")), ("light", tr("Claro", "Light", "ライト")), ("dark", tr("Oscuro", "Dark", "ダーク")) })
         {
             bool on = (Settings.Current.Appearance ?? "dark") == key;
-            var b = new Button
-            {
-                Content = new TextBlock { Text = label, FontSize = 13, Foreground = on ? Theme.OnAccent : Theme.Text },
-                Background = on ? Theme.Accent : Theme.Card, Template = Theme.FlatTemplate(6),
-                Padding = new Thickness(14, 6, 14, 6), Margin = new Thickness(0, 0, 6, 0), Cursor = System.Windows.Input.Cursors.Hand,
-            };
-            b.Click += (s, e) => Theme.SetAppearance(key);
-            looks.Children.Add(b);
+            looks.Children.Add(Choice(label, on, () => Theme.SetAppearance(key)));
         }
         panel.Children.Add(looks);
         panel.Children.Add(new TextBlock
         {
-            Text = tr("Color de los botones y del ícono", "Colour of the buttons and the icon"),
+            Text = tr("Color de los botones y del ícono", "Colour of the buttons and the icon", "ボタンとアイコンの色"),
             FontWeight = FontWeights.SemiBold, FontSize = 13.5, Margin = new Thickness(0, 18, 0, 0),
         });
         var grid = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
@@ -160,6 +191,7 @@ internal sealed class SettingsWindow : Window
                 Background = on ? Theme.AccentSoft : Brushes.Transparent, BorderBrush = Theme.Accent,
                 Cursor = System.Windows.Input.Cursors.Hand, ToolTip = a.Name,
             };
+            Theme.KeyboardReachable(b, a.Name, 8);
             b.Click += (s, e) => Theme.SetAccent(a.Key);
             grid.Children.Add(b);
         }
@@ -167,7 +199,8 @@ internal sealed class SettingsWindow : Window
         panel.Children.Add(new TextBlock
         {
             Text = tr("El color se usa en los botones, la selección y el ícono de la ventana y de la barra de tareas mientras Citadel está abierto. El acceso directo conserva el ícono verde.",
-                      "The colour is used for the buttons, the selection and the icon of the window and the taskbar while Citadel is open. The shortcut keeps the green icon."),
+                      "The colour is used for the buttons, the selection and the icon of the window and the taskbar while Citadel is open. The shortcut keeps the green icon.",
+                      "この色は、Citadel を開いている間、ボタン、選択範囲、ウィンドウとタスク バーのアイコンに使われます。ショートカットのアイコンは緑のままです。"),
             FontSize = 12, Foreground = Theme.Secondary, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 0),
         });
         return new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
@@ -176,22 +209,22 @@ internal sealed class SettingsWindow : Window
     private UIElement OllamaTab()
     {
         var panel = new StackPanel { Margin = new Thickness(6, 14, 6, 6) };
-        panel.Children.Add(new TextBlock { Text = tr("Dónde corre Ollama", "Where Ollama runs"), FontWeight = FontWeights.SemiBold, FontSize = 13.5 });
-        var local = new RadioButton
+        panel.Children.Add(new TextBlock { Text = tr("Dónde corre Ollama", "Where Ollama runs", "Ollama の実行場所"), FontWeight = FontWeights.SemiBold, FontSize = 13.5 });
+        var local = localChoice = new RadioButton
         {
-            Content = tr("En esta computadora (127.0.0.1:11434)", "On this computer (127.0.0.1:11434)"),
+            Content = tr("En esta computadora (127.0.0.1:11434)", "On this computer (127.0.0.1:11434)", "このコンピューター (127.0.0.1:11434)"),
             IsChecked = !Settings.Current.UseSsh, Margin = new Thickness(0, 10, 0, 0), GroupName = "where",
         };
-        var remote = new RadioButton
+        var remote = remoteChoice = new RadioButton
         {
-            Content = tr("En otra computadora, por SSH", "On another computer, through SSH"),
+            Content = tr("En otra computadora, por SSH", "On another computer, through SSH", "別のコンピューター (SSH 経由)"),
             IsChecked = Settings.Current.UseSsh, Margin = new Thickness(0, 8, 0, 0), GroupName = "where",
         };
-        var host = new TextBox
+        var host = hostBox = new TextBox
         {
             Text = Settings.Current.SshHost ?? "", FontFamily = Theme.Mono, FontSize = 12.5, Padding = new Thickness(6, 4, 6, 4),
             Margin = new Thickness(26, 8, 0, 0), MaxWidth = 420, HorizontalAlignment = HorizontalAlignment.Left, MinWidth = 320,
-            ToolTip = tr("usuario@equipo, o un Host de ~/.ssh/config", "user@host, or a Host from ~/.ssh/config"),
+            ToolTip = tr("usuario@equipo, o un Host de ~/.ssh/config", "user@host, or a Host from ~/.ssh/config", "user@host、または ~/.ssh/config の Host 名"),
         };
         host.IsEnabled = remote.IsChecked == true;
         remote.Checked += (s, e) => host.IsEnabled = true;
@@ -202,11 +235,12 @@ internal sealed class SettingsWindow : Window
         panel.Children.Add(new TextBlock
         {
             Text = tr("Citadel abre un túnel con el ssh de Windows hasta el puerto 11434 de esa computadora y lo cierra al salir. Usa tu llave SSH: nunca pide contraseña. El manual explica cómo preparar las dos computadoras.",
-                      "Citadel opens a tunnel with the Windows ssh command to port 11434 of that computer and closes it on exit. It uses your SSH key and never asks for a password. The manual explains how to prepare both computers."),
+                      "Citadel opens a tunnel with the Windows ssh command to port 11434 of that computer and closes it on exit. It uses your SSH key and never asks for a password. The manual explains how to prepare both computers.",
+                      "Citadel は Windows の ssh コマンドで、そのコンピューターのポート 11434 へのトンネルを開き、終了時に閉じます。SSH キーを使うので、パスワードを求めることはありません。両方のコンピューターの準備方法はマニュアルで説明しています。"),
             FontSize = 12, Foreground = Theme.Secondary, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 12, 0, 0),
         });
         var result = new TextBlock { FontSize = 12, Foreground = Theme.Secondary, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-        var apply = new Button { Content = tr("Aplicar y probar", "Apply and test"), Padding = new Thickness(12, 4, 12, 4) };
+        var apply = new Button { Content = tr("Aplicar y probar", "Apply and test", "適用してテスト"), Padding = new Thickness(12, 4, 12, 4) };
         apply.Click += async (s, e) =>
         {
             Settings.Current.UseSsh = remote.IsChecked == true && host.Text.Trim().Length > 0;
@@ -214,11 +248,11 @@ internal sealed class SettingsWindow : Window
             Settings.Current.Save();
             Connection.Stop();
             apply.IsEnabled = false;
-            result.Text = tr("Conectando…", "Connecting…");
+            result.Text = tr("Conectando…", "Connecting…", "接続しています…");
             try
             {
                 var models = await Ollama.ListModels();
-                result.Text = tr($"Conectado: {models.Count} modelo(s). ", $"Connected: {models.Count} model(s). ") + string.Join(", ", models);
+                result.Text = tr("Conectado: {0} modelo(s). ", "Connected: {0} model(s). ", "接続しました: モデル {0} 個。 ", models.Count) + string.Join(", ", models);
             }
             catch (Exception ex) { result.Text = ex.Message; }
             finally { apply.IsEnabled = true; }
@@ -233,14 +267,14 @@ internal sealed class SettingsWindow : Window
         if (memoryList == null) return;
         folderText.Text = Paths.Short(MemoryStore.Folder);
         var all = MemoryStore.All();
-        countText.Text = tr($"Memorias ({all.Count})", $"Memories ({all.Count})");
+        countText.Text = tr("Memorias ({0})", "Memories ({0})", "メモリ ({0})", all.Count);
         memoryList.Children.Clear();
         foreach (var m in all)
         {
             var row = new DockPanel { Margin = new Thickness(10, 6, 6, 6) };
             var buttons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-            buttons.Children.Add(Theme.FlatButton(Theme.GlyphSearch, null, () => ShowInExplorer(m.File), tr("Mostrar en el Explorador", "Show in File Explorer")));
-            buttons.Children.Add(Theme.FlatButton(Theme.GlyphTrash, null, () => DeleteMemory(m), tr("Eliminar", "Delete")));
+            buttons.Children.Add(Theme.FlatButton(Theme.GlyphSearch, null, () => ShowInExplorer(m.File), tr("Mostrar en el Explorador", "Show in File Explorer", "エクスプローラーで表示")));
+            buttons.Children.Add(Theme.FlatButton(Theme.GlyphTrash, null, () => DeleteMemory(m), tr("Eliminar", "Delete", "削除")));
             DockPanel.SetDock(buttons, Dock.Right);
             row.Children.Add(buttons);
             var icon = Theme.Icon(Theme.GlyphDocument, 15, Theme.Accent);
@@ -251,7 +285,7 @@ internal sealed class SettingsWindow : Window
             text.Children.Add(new TextBlock { Text = m.File, FontFamily = Theme.Mono, FontSize = 13, FontWeight = FontWeights.SemiBold });
             text.Children.Add(new TextBlock
             {
-                Text = m.Topic.Length == 0 ? tr("(no figura en el índice)", "(not in the index)") : m.Topic,
+                Text = m.Topic.Length == 0 ? tr("(no figura en el índice)", "(not in the index)", "(インデックスにありません)") : m.Topic,
                 FontSize = 12, Foreground = Theme.Secondary, TextTrimming = TextTrimming.CharacterEllipsis,
             });
             row.Children.Add(text);
@@ -273,14 +307,14 @@ internal sealed class SettingsWindow : Window
 
     private void DeleteMemory(MemoryEntry m)
     {
-        if (!Dialogs.Confirm(this, tr("¿Eliminar esta memoria?", "Delete this memory?"),
-                             tr($"Se borra el archivo {m.File} y su línea del índice.", $"The file {m.File} and its index line will be removed."),
-                             tr("Eliminar", "Delete")))
+        if (!Dialogs.Confirm(this, tr("¿Eliminar esta memoria?", "Delete this memory?", "このメモリを削除しますか?"),
+                             tr("Se borra el archivo {0} y su línea del índice.", "The file {0} and its index line will be removed.", "ファイル {0} と、インデックスのその行を削除します。", m.File),
+                             tr("Eliminar", "Delete", "削除")))
             return;
         try
         {
             MemoryStore.Delete(m.File);
-            message.Text = tr($"Eliminada: {m.File}", $"Deleted: {m.File}");
+            message.Text = tr("Eliminada: {0}", "Deleted: {0}", "削除しました: {0}", m.File);
         }
         catch (Exception ex) { message.Text = ex.Message; }
         ReloadMemories();
@@ -308,7 +342,8 @@ internal sealed class SettingsWindow : Window
         top.Children.Add(new TextBlock
         {
             Text = tr("Estas reglas van como mensaje de sistema en cada consulta, junto con el índice de memorias.",
-                      "These rules go as the system message of every request, together with the memory index."),
+                      "These rules go as the system message of every request, together with the memory index.",
+                      "これらのルールは、メモリのインデックスと一緒に、毎回のリクエストのシステム メッセージとして送られます。"),
             FontSize = 12, Foreground = Theme.Secondary, TextWrapping = TextWrapping.Wrap,
         });
         top.Children.Add(new TextBlock { Text = Paths.Short(Paths.Rules), FontFamily = Theme.Mono, FontSize = 11.5, Foreground = Theme.Secondary, Margin = new Thickness(0, 4, 0, 8) });
@@ -316,9 +351,9 @@ internal sealed class SettingsWindow : Window
         panel.Children.Add(top);
 
         var status = new TextBlock { FontSize = 12, Foreground = Theme.Secondary, VerticalAlignment = VerticalAlignment.Center };
-        var restore = new Button { Content = tr("Restaurar las originales", "Restore defaults"), Padding = new Thickness(12, 4, 12, 4), Margin = new Thickness(8, 0, 0, 0) };
-        revertRules = new Button { Content = tr("Descartar cambios", "Revert"), Padding = new Thickness(12, 4, 12, 4), Margin = new Thickness(8, 0, 0, 0) };
-        saveRules = new Button { Content = tr("Guardar", "Save"), Padding = new Thickness(12, 4, 12, 4), Margin = new Thickness(8, 0, 0, 0), ToolTip = "Ctrl+S" };
+        var restore = new Button { Content = tr("Restaurar las originales", "Restore defaults", "既定に戻す"), Padding = new Thickness(12, 4, 12, 4), Margin = new Thickness(8, 0, 0, 0) };
+        revertRules = new Button { Content = tr("Descartar cambios", "Revert", "変更を破棄"), Padding = new Thickness(12, 4, 12, 4), Margin = new Thickness(8, 0, 0, 0) };
+        saveRules = new Button { Content = tr("Guardar", "Save", "保存"), Padding = new Thickness(12, 4, 12, 4), Margin = new Thickness(8, 0, 0, 0), ToolTip = "Ctrl+S" };
         rulesBox = new TextBox
         {
             Text = Rules.Load().Replace("\n", Environment.NewLine), AcceptsReturn = true, TextWrapping = TextWrapping.Wrap,
@@ -354,7 +389,7 @@ internal sealed class SettingsWindow : Window
         try
         {
             Rules.Save(rulesBox.Text.Replace("\r\n", "\n"));
-            rulesStatus.Text = tr("Reglas guardadas.", "Rules saved.");
+            rulesStatus.Text = tr("Reglas guardadas.", "Rules saved.", "ルールを保存しました。");
             rulesDirty = false;
             saveRules.IsEnabled = revertRules.IsEnabled = false;
         }

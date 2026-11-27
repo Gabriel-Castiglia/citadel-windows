@@ -127,12 +127,14 @@ internal static partial class Markdown
                 italic.Inlines.AddRange(Inlines(m.Groups[4].Success ? m.Groups[4].Value : m.Groups[5].Value));
                 yield return italic;
             }
-            else
+            else if (Uri.TryCreate(m.Groups[7].Value, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
             {
-                var link = new Hyperlink(new Run(m.Groups[6].Value)) { NavigateUri = new Uri(m.Groups[7].Value), Foreground = Theme.Accent };
+                // Only http and https links open; an address that is not a valid URI stays as plain text.
+                var link = new Hyperlink(new Run(m.Groups[6].Value)) { NavigateUri = uri, Foreground = Theme.Accent, ToolTip = uri.AbsoluteUri };
                 link.RequestNavigate += (o, e) => Open(e.Uri.AbsoluteUri);
                 yield return link;
             }
+            else yield return new Run(m.Value);
             pos = m.Index + m.Length;
         }
         if (pos < s.Length) yield return new Run(s[pos..]);
@@ -231,22 +233,23 @@ internal static partial class Markdown
     /// <summary>A code block: language, Copy button and the code in a monospaced, selectable box.</summary>
     public static UIElement CodeView(string language, string code)
     {
-        var copyLabel = new TextBlock { Text = tr("Copiar", "Copy"), FontSize = 12, Foreground = Theme.Secondary, Margin = new Thickness(6, 0, 0, 0) };
+        var copyLabel = new TextBlock { Text = tr("Copiar", "Copy", "コピー"), FontSize = 12, Foreground = Theme.Secondary, Margin = new Thickness(6, 0, 0, 0) };
         var copyIcon = Theme.Icon(Theme.GlyphCopy, 12);
         var copy = new Button
         {
             Content = new StackPanel { Orientation = Orientation.Horizontal, Children = { copyIcon, copyLabel } },
             Template = Theme.FlatTemplate(4), Background = Brushes.Transparent, Padding = new Thickness(6, 2, 6, 2),
-            Cursor = System.Windows.Input.Cursors.Hand, Focusable = false,
+            Cursor = System.Windows.Input.Cursors.Hand,
         };
+        Theme.KeyboardReachable(copy, tr("Copiar", "Copy", "コピー"), 4);
         copy.Click += async (s, e) =>
         {
             Clip.Set(code);
             copyIcon.Text = Theme.GlyphCheck;
-            copyLabel.Text = tr("Copiado", "Copied");
+            copyLabel.Text = tr("Copiado", "Copied", "コピーしました");
             await Task.Delay(1500);
             copyIcon.Text = Theme.GlyphCopy;
-            copyLabel.Text = tr("Copiar", "Copy");
+            copyLabel.Text = tr("Copiar", "Copy", "コピー");
         };
         var header = new DockPanel { Margin = new Thickness(12, 5, 6, 5) };
         DockPanel.SetDock(copy, Dock.Right);

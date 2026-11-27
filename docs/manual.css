@@ -11,56 +11,110 @@
  * It is distributed WITHOUT ANY WARRANTY. See the LICENSE file for details.
  */
 
-@page { size: A4; margin: 20mm 18mm 22mm; }
+@page { size: A4; margin: 18mm 18mm 20mm; }
 
+/*
+ * The colours of Citadel's own light theme (Theme.cs) with its default accent, green, so the manual looks like
+ * the program it describes. The green of the icon (#2A9D57) marks rules and tiles; text in green uses a deeper
+ * tone of it, which reads better on white.
+ */
 :root {
-    --text: #1d2125;
-    --muted: #5b636b;
-    --accent: #1f7a45;
-    --line: #dfe3e6;
-    --code-bg: #f4f6f7;
+    --text: #1b1b1c;        /* Theme.Text */
+    --muted: #5a5a5e;       /* Theme.Secondary */
+    --accent: #1f7a45;      /* the green accent, deeper, for text */
+    --accent-icon: #2a9d57; /* the green of the icon and of the light theme */
+    --accent-soft: #dcefe3; /* the green at 18 % over white */
+    --line: #d2d2d4;        /* Theme.Stroke */
+    --code-bg: #efeff0;     /* Theme.Code */
 }
 
 html { font-size: 10.5pt; }
 
 body {
-    font-family: "Segoe UI Variable Text", "Segoe UI", -apple-system, "Helvetica Neue", sans-serif;
+    font-family: "Segoe UI Variable Text", "Segoe UI", "Yu Gothic UI", "Meiryo UI", -apple-system, "Helvetica Neue", sans-serif;
     color: var(--text);
-    line-height: 1.5;
+    line-height: 1.55;
     max-width: none;
     margin: 0;
+    padding: 0;
+}
+/* Japanese: a Japanese typeface for the text, slightly more leading, and lines broken by Japanese rules. */
+html[lang="ja"] body {
+    font-family: "Segoe UI Variable Text", "Segoe UI", "Yu Gothic UI", "Yu Gothic", "Meiryo UI", Meiryo, "Hiragino Sans", sans-serif;
+    line-height: 1.7;
+    line-break: strict;
+    word-break: normal;
+    overflow-wrap: anywhere;
 }
 
 .cover {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 16px;
     padding-bottom: 14px;
-    margin-bottom: 18px;
-    border-bottom: 2px solid var(--accent);
+    margin-bottom: 14px;
+    border-bottom: 3px solid var(--accent-icon);
 }
-.cover img { width: 64px; height: 64px; }
-.cover .name { font-size: 22pt; font-weight: 700; margin: 0; }
-.cover .subtitle { margin: 2px 0 0; color: var(--muted); }
+.cover img { width: 76px; height: 76px; }
+.cover .name { font-size: 24pt; font-weight: 700; margin: 0; line-height: 1.15; }
+.cover .subtitle { margin: 3px 0 0; color: var(--muted); }
 
 /* The README title is hidden: the cover block replaces it. */
-body > h1:first-of-type { display: none; }
+body > h1:first-of-type, header#title-block-header { display: none; }
+
+/* Contents, under the cover: the README title is its only top-level entry, so only the sections are shown. */
+nav#TOC {
+    margin: 0 0 16px;
+    padding: 10px 14px 8px;
+    background: #f7f7f7;    /* Theme.Window */
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    break-inside: avoid;
+}
+nav#TOC h2#toc-title {
+    font-size: 11pt;
+    margin: 0 0 4px;
+    padding: 0;
+    border: none;
+}
+nav#TOC ul { list-style: none; margin: 0; padding: 0; }
+nav#TOC > ul > li > a { display: none; }
+nav#TOC > ul > li > ul { columns: 2; column-gap: 24px; }
+nav#TOC li li { break-inside: avoid; padding: 1px 0; }
+nav#TOC li li li { display: none; }
+nav#TOC a { color: var(--text); }
 
 h2 {
-    font-size: 14pt;
+    font-size: 14.5pt;
     color: var(--accent);
-    margin: 22px 0 6px;
+    margin: 24px 0 8px;
     padding-bottom: 3px;
     border-bottom: 1px solid var(--line);
     break-after: avoid;
 }
+h3 {
+    font-size: 11.5pt;
+    margin: 16px 0 4px;
+    break-after: avoid;
+}
+h2 + p, h3 + p { break-before: avoid; }
 
 p, li { orphans: 3; widows: 3; }
 
 a { color: var(--accent); text-decoration: none; }
 
+blockquote {
+    margin: 10px 0;
+    padding: 8px 12px;
+    background: var(--accent-soft);
+    border-left: 4px solid var(--accent-icon);
+    border-radius: 0 6px 6px 0;
+    break-inside: avoid;
+}
+blockquote p { margin: 0; }
+
 code {
-    font-family: "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
+    font-family: "Cascadia Mono", Consolas, "SF Mono", Menlo, "MS Gothic", monospace;
     font-size: 0.88em;
     background: var(--code-bg);
     padding: 1px 4px;
@@ -83,11 +137,32 @@ table {
     border-collapse: collapse;
     margin: 8px 0 12px;
     font-size: 0.92em;
-    break-inside: avoid;
 }
+tr, td, th { break-inside: avoid; }
+thead { display: table-header-group; }
 th, td { border: 1px solid var(--line); padding: 5px 7px; text-align: left; vertical-align: top; }
-th { background: var(--code-bg); }
+th { background: var(--accent-soft); }
 td code { overflow-wrap: anywhere; }
 
-/* Screenshots: centered, never wider than the page, and short enough to keep the text around them. */
-p > img { display: block; margin: 8px auto 4px; max-width: 100%; max-height: 95mm; }
+/* Screenshots: centered, never wider than the page, never split across pages, and short enough to keep the
+ * text around them. The dark windows get a thin frame so they do not float on the white page. */
+p:has(> img) { break-inside: avoid; text-align: center; margin: 10px 0; }
+p > img {
+    display: block;
+    margin: 8px auto 4px;
+    max-width: 100%;
+    max-height: 95mm;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    break-inside: avoid;
+}
+p > img.narrow { max-width: 62%; }
+
+/* The first column names things (a tab, a key, a file): wide enough not to break those names. */
+td:first-child { min-width: 8.5em; }
+td:first-child code { white-space: nowrap; }
+
+/* Titles stay with what follows them; a title with its text and its picture, table or code block (.keep, from
+ * manual.sh; pandoc writes it as a section) is never split. */
+h1, h2, h3 { break-after: avoid; page-break-after: avoid; break-inside: avoid; }
+.keep { break-inside: avoid; page-break-inside: avoid; }

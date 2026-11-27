@@ -55,31 +55,32 @@ internal sealed class AboutWindow : Window
 
     private void Build()
     {
-        Title = tr("Acerca de Citadel", "About Citadel");
+        Title = tr("Acerca de Citadel", "About Citadel", "Citadel について");
         var root = new StackPanel { Margin = new Thickness(28, 26, 28, 22) };
         root.Children.Add(new Image { Source = Theme.AppIcon, Width = 96, Height = 96 });
         root.Children.Add(new TextBlock { Text = "Citadel", FontSize = 24, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 12, 0, 2) });
-        root.Children.Add(Centered(tr("Versión ", "Version ") + VersionText, Theme.Secondary));
-        root.Children.Add(Centered(tr("Chat con modelos de lenguaje locales servidos por Ollama.", "Chat with local language models served by Ollama."), null, 8));
+        root.Children.Add(Centered(tr("Versión ", "Version ", "バージョン ") + VersionText, Theme.Secondary));
+        root.Children.Add(Centered(tr("Chat con modelos de lenguaje locales servidos por Ollama.", "Chat with local language models served by Ollama.", "Ollama が提供するローカル言語モデルとチャットできます。"), null, 8));
         root.Children.Add(new Border { Height = 1, Background = Theme.Stroke, Margin = new Thickness(0, 14, 0, 12) });
-        root.Children.Add(Centered(tr("Autor: ", "Author: ") + Author));
+        root.Children.Add(Centered(tr("Autor: ", "Author: ", "作者: ") + Author));
         root.Children.Add(Centered("Copyright © 2026 " + Author, Theme.Secondary, 4));
-        root.Children.Add(Centered(tr("Licencia: GNU GPL, solo la versión 2 (GPL-2.0-only).", "License: GNU GPL, version 2 only (GPL-2.0-only)."), Theme.Secondary, 4));
+        root.Children.Add(Centered(tr("Licencia: GNU GPL, solo la versión 2 (GPL-2.0-only).", "License: GNU GPL, version 2 only (GPL-2.0-only).", "ライセンス: GNU GPL バージョン 2 のみ (GPL-2.0-only)。"), Theme.Secondary, 4));
         var repo = new TextBlock { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 4, 0, 0) };
         var link = new Hyperlink(new Run(Repository.Replace("https://", ""))) { NavigateUri = new Uri(Repository), Foreground = Theme.Accent };
         link.RequestNavigate += (s, e) => Open(Repository);
         repo.Inlines.Add(link);
         root.Children.Add(repo);
         root.Children.Add(Centered(tr("Este programa es software libre y se distribuye SIN NINGUNA GARANTÍA.",
-                                      "This program is free software and comes with ABSOLUTELY NO WARRANTY."), Theme.Tertiary, 12));
+                                      "This program is free software and comes with ABSOLUTELY NO WARRANTY.",
+                                      "このプログラムはフリーソフトウェアであり、一切の保証はありません。"), Theme.Tertiary, 12));
 
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 18, 0, 0) };
-        var license = new Button { Content = tr("Ver licencia", "View license"), Padding = new Thickness(14, 5, 14, 5), MinWidth = 96 };
+        var license = new Button { Content = tr("Ver licencia", "View license", "ライセンスを表示"), Padding = new Thickness(14, 5, 14, 5), MinWidth = 96 };
         license.Click += (s, e) => ShowLicense();
         // The check runs in the main window once this one closes, so its questions have a window to belong to.
-        var updates = new Button { Content = tr("Buscar actualizaciones", "Check for updates"), Padding = new Thickness(14, 5, 14, 5), MinWidth = 96, Margin = new Thickness(8, 0, 0, 0) };
+        var updates = new Button { Content = tr("Buscar actualizaciones", "Check for updates", "更新を確認"), Padding = new Thickness(14, 5, 14, 5), MinWidth = 96, Margin = new Thickness(8, 0, 0, 0) };
         updates.Click += (s, e) => { CheckForUpdates = true; Close(); };
-        var close = new Button { Content = tr("Cerrar", "Close"), Padding = new Thickness(14, 5, 14, 5), MinWidth = 96, Margin = new Thickness(8, 0, 0, 0), IsDefault = true, IsCancel = true };
+        var close = new Button { Content = tr("Cerrar", "Close", "閉じる"), Padding = new Thickness(14, 5, 14, 5), MinWidth = 96, Margin = new Thickness(8, 0, 0, 0), IsDefault = true, IsCancel = true };
         close.Click += (s, e) => Close();
         buttons.Children.Add(license);
         buttons.Children.Add(updates);

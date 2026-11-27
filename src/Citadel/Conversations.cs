@@ -66,14 +66,14 @@ internal sealed class Conversation
     public DateTime Updated { get; set; } = DateTime.UtcNow;
     public List<ChatMessage> Messages { get; set; } = [];
 
-    [JsonIgnore] public string DisplayTitle => Title.Length == 0 ? tr("Conversación nueva", "New conversation") : Title;
+    [JsonIgnore] public string DisplayTitle => Title.Length == 0 ? tr("Conversación nueva", "New conversation", "新しい会話") : Title;
 
     /// <summary>Title = the first line of the first user message, trimmed to 60 characters.</summary>
     public static string TitleFrom(string text)
     {
         string line = text.Trim().Split('\n')[0].Trim();
         line = string.Join(' ', line.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries));
-        return line.Length > 60 ? line[..60].Trim() + "…" : line;
+        return line.Length > 60 ? Text.Cut(line, 60).Trim() + "…" : line;
     }
 }
 
@@ -100,13 +100,30 @@ internal static class ConversationStore
                 try
                 {
                     var c = JsonSerializer.Deserialize<Conversation>(File.ReadAllText(f), Json);
-                    if (c != null) list.Add(c);
+                    if (c != null) list.Add(Repair(c));
                 }
                 catch (Exception ex) { Program.Log($"Skipped {Path.GetFileName(f)}: {ex.Message}"); }
             }
         }
         catch (Exception ex) { Program.Log("Could not read the conversations: " + ex.Message); }
         return list.OrderByDescending(c => c.Updated).ToList();
+    }
+
+    /// <summary>Fills fields written as null (a file edited by hand), so the rest of the app never meets a null.</summary>
+    private static Conversation Repair(Conversation c)
+    {
+        c.Title ??= "";
+        c.Messages ??= [];
+        c.Messages.RemoveAll(m => m == null);
+        foreach (var m in c.Messages)
+        {
+            m.Content ??= "";
+            m.Thinking ??= "";
+            m.Attachments ??= [];
+            m.Attachments.RemoveAll(a => a == null);
+            foreach (var a in m.Attachments) { a.Name ??= ""; a.Text ??= ""; }
+        }
+        return c;
     }
 
     public static void Save(Conversation c)

@@ -1,8 +1,8 @@
 # Citadel para Windows
 
-Gabriel Castiglia · 27 de noviembre de 2026 · versión 1.3.2 · licencia GPL-2.0
+Gabriel Castiglia · 27 de noviembre de 2026 · versión 1.4.0 · licencia GPL-2.0
 
-[English](README.md) · Español
+[English](README.md) · Español · [日本語](README.ja.md)
 
 Repositorio: <https://github.com/Gabriel-Castiglia/citadel-windows>
 
@@ -11,9 +11,11 @@ Manual en PDF: [`docs/Citadel-manual-es.pdf`](docs/Citadel-manual-es.pdf)
 Citadel es una app de chat para Windows 10 y 11 que conversa con modelos de lenguaje que corren en la
 misma computadora mediante [Ollama](https://ollama.com). Nada de lo que escribes sale de la computadora:
 la app solo se conecta con Ollama en `127.0.0.1:11434`, salvo que elijas usar el Ollama de otra
-computadora tuya por SSH (ver [Ollama en otra computadora](#ollama-en-otra-computadora)); la única otra conexión es la búsqueda diaria de una versión nueva en GitHub (ver [Actualizaciones](#actualizaciones)), que no envía nada tuyo. Está escrita en C# con .NET 10 y WPF, usa el
-estilo de Windows 11, oscuro, claro o como Windows, en uno de doce colores, y su interfaz está en inglés y en español. La
-versión para macOS, con las mismas funciones, tiene su propio repositorio:
+computadora tuya por SSH (ver [Ollama en otra computadora](#ollama-en-otra-computadora)); la única
+otra conexión es la búsqueda diaria de una versión nueva en GitHub (ver
+[Actualizaciones](#actualizaciones)), que no envía nada tuyo. Está escrita en C# con .NET 10 y WPF, usa
+el estilo de Windows 11, oscuro, claro o como Windows, en uno de doce colores, y su interfaz está en
+inglés, en español y en japonés. La versión para macOS, con las mismas funciones, tiene su propio repositorio:
 <https://github.com/Gabriel-Castiglia/citadel>.
 
 Citadel es una ventana de chat, no un agente. El modelo no puede abrir archivos, ejecutar comandos ni
@@ -26,7 +28,8 @@ cada pedido y, cuando lo pides, una de tus memorias guardadas.
 
 - Windows 11, o Windows 10 versión 1803 o posterior, de 64 bits.
 - Ollama para Windows, desde <https://ollama.com/download>. Su instalador lo deja funcionando en segundo
-  plano y arrancando con Windows. Después se descarga un modelo, en PowerShell:
+  plano y arrancando con Windows (su ícono de llama queda en el área de notificación). Después se
+  descarga un modelo, en PowerShell:
 
   ```
   ollama pull qwen3:8b
@@ -53,12 +56,13 @@ Hay tres formas de obtener Citadel; las tres las genera `scripts\build.ps1` en l
 
 | Archivo | Qué es |
 |---|---|
-| `citadel-setup.exe` | Programa de instalación, en inglés o en español. La forma habitual de instalar. |
+| `citadel-setup.exe` | Programa de instalación, en inglés, en español o en japonés. La forma habitual de instalar. |
 | `citadel.msi` | La misma instalación como paquete de Windows Installer, para instalar sin ventanas: `msiexec /i citadel.msi /qn`. |
 | `Citadel.exe` | El programa solo; funciona sin instalar desde cualquier carpeta. |
 
-El programa de instalación abre una ventana con un menú de idioma arriba a la derecha, y cada página
-cambia de idioma al instante. Instala Citadel para todos los usuarios en `C:\Program Files\Citadel`, lo
+El programa de instalación abre una ventana con un menú de idioma arriba a la derecha (empieza en el
+idioma de Windows si es español o japonés, y si no en inglés), y cada página cambia de idioma al
+instante. Instala Citadel para todos los usuarios en `C:\Program Files\Citadel`, lo
 que requiere permisos de administrador (Windows los pide al empezar la instalación), y agrega Citadel al
 menú Inicio. El idioma elegido en la ventana de instalación es el que Citadel usa la primera vez que
 arranca.
@@ -71,9 +75,9 @@ reemplazar sus archivos. Una versión más vieja no se puede instalar encima de 
 
 ### Actualizaciones
 
-Un Citadel instalado busca una versión nueva una vez por día, y Acerca de → Buscar actualizaciones busca
-en el momento. Si la hay, hace una sola pregunta: Actualizar ahora, Ver novedades (abre la página de la
-versión) o Más tarde. Actualizar ahora hace el resto solo: comprueba que el `SHA256SUMS.txt` de la versión
+Citadel busca una versión nueva una vez por día, unos segundos después de arrancar, y Acerca de → Buscar
+actualizaciones busca en el momento. Si un Citadel instalado encuentra una, hace una sola pregunta:
+Actualizar ahora, Ver novedades (abre la página de la versión) o Más tarde. Actualizar ahora hace el resto solo: comprueba que el `SHA256SUMS.txt` de la versión
 lleve la firma del autor (`release.sig`, que se comprueba con dos claves que trae Citadel; una versión sin firma
 válida no instala nada y solo se puede bajar a mano desde su página), descarga `citadel-setup.exe` y lo
 comprueba con ese `SHA256SUMS.txt` (un archivo que no coincide se borra y nunca se ejecuta),
@@ -81,9 +85,11 @@ cierra Citadel, instala la versión nueva en silencio con el idioma elegido al i
 abrirlo. Windows pide permisos de administrador, como en cualquier instalación. Si se está escribiendo
 una respuesta, Citadel primero pregunta si esperarla o detenerla, así queda guardada en su conversación;
 el texto que se estaba escribiendo, sus adjuntos y la conversación abierta vuelven después del reinicio.
-Si la instalación falla o se rechaza, se vuelve a abrir la versión anterior.
+Después de la actualización, un aviso arriba de la ventana dice «Citadel se actualizó a la versión …». Si
+la instalación falla o se rechaza, se vuelve a abrir la versión anterior.
 
-El `Citadel.exe` independiente no puede actualizarse solo: solo ofrece la página de la versión.
+El `Citadel.exe` independiente no puede actualizarse solo: cuando hay una versión nueva ofrece Abrir la
+página o Más tarde.
 
 Los archivos no están firmados con un certificado comercial, así que la primera vez Windows SmartScreen
 puede mostrar «Windows protegió su PC». «Más información» → «Ejecutar de todas formas» los abre.
@@ -107,16 +113,22 @@ Para desinstalar sin ventanas: `citadel-setup.exe /uninstall /quiet`.
 
 Escribe en el cuadro de abajo y pulsa Enter para enviar. Shift+Enter (o Alt+Enter) empieza una línea
 nueva. La respuesta aparece a medida que se escribe, con formato Markdown: títulos, listas, tablas,
-citas, negrita, código en línea y bloques de código en un recuadro de letra monoespaciada con su propio
-botón Copiar. La respuesta entera se puede seleccionar con el mouse. Debajo de cada respuesta están el
+citas, negrita, código en línea, enlaces y bloques de código en un recuadro de letra monoespaciada con su
+propio botón Copiar. Un enlace se abre en el navegador, y al pasar el puntero por encima muestra su
+dirección. La respuesta entera se puede seleccionar con el mouse. Debajo de cada respuesta están el
 botón Copiar de la respuesta entera, el modelo, su velocidad en tokens por segundo y los segundos que
 tardó.
+
+Citadel abre una sola ventana: si lo vuelves a abrir (desde el menú Inicio, por ejemplo), trae al frente
+la ventana que ya está abierta, restaurada si estaba minimizada. La ventana se abre donde se cerró y con
+el mismo tamaño, maximizada si estaba maximizada.
 
 ### Conversaciones
 
 La barra lateral lista las conversaciones, de la más nueva a la más vieja. Ctrl+N o el botón del lápiz
 empiezan una nueva, cuyo título es la primera línea del primer mensaje. Con clic derecho sobre una
-conversación se la renombra o se la elimina; eliminar pide confirmación y borra su archivo del disco.
+conversación aparecen Renombrar…, Exportar a Markdown… y Eliminar…; eliminar pide confirmación y borra
+su archivo del disco, y no se puede deshacer.
 
 ### Búsqueda
 
@@ -180,12 +192,19 @@ Con Razonar activo, una respuesta puede escribir hasta 8.000 tokens; sin él, ha
 ### Detener
 
 Mientras se escribe una respuesta, el botón de enviar pasa a ser Detener (también Esc). Cierra la
-conexión y Ollama deja de generar; lo escrito hasta ese momento queda, marcado como «Detenido».
+conexión y Ollama deja de generar; lo escrito hasta ese momento queda, marcado como «Detenido». Esc
+también cancela una memoria que `/save` todavía está redactando.
 
 ### Adjuntos
 
 Arrastra un archivo `.txt` o `.md` al cuadro de texto para adjuntar su texto al próximo mensaje; una
-etiqueta muestra el nombre del archivo y su largo, con un botón para quitarlo.
+etiqueta muestra el nombre del archivo y su largo en caracteres, con un botón para quitarlo. Se pueden
+adjuntar varios archivos a un mismo mensaje. Los de otro tipo se rechazan con «Solo se pueden adjuntar
+archivos .txt o .md.», y un archivo de más de 2 MB, con «<nombre> pesa más de 2 MB: no se adjuntó.». El
+texto se lee en la codificación con que se guardó el archivo: la que indica su marca de orden de bytes;
+si no tiene, UTF-8; y si no es UTF-8 válido, la página de códigos de Windows para programas que no son
+Unicode (como Windows-1252 o Shift_JIS), así un archivo viejo del Bloc de notas no muestra caracteres
+rotos.
 
 ### Memorias
 
@@ -216,7 +235,7 @@ sin guardar nada; por eso el modelo solo redacta el texto, y la app escribe el a
 
 ## Ajustes
 
-El botón Ajustes, abajo en la barra lateral (o Ctrl+,), abre una ventana con tres pestañas.
+El botón Ajustes, abajo en la barra lateral (o Ctrl+,), abre una ventana con cuatro pestañas.
 
 ![Ajustes, pestaña Memorias](docs/images/settings-es.png)
 
@@ -224,7 +243,11 @@ El botón Ajustes, abajo en la barra lateral (o Ctrl+,), abre una ventana con tr
 |---|---|
 | Memorias | La carpeta de memorias (Elegir…, o Por defecto para volver a `%APPDATA%\Citadel\memories`), la lista de memorias con su línea del índice, Abrir carpeta, Mostrar en el Explorador para cada memoria, y Eliminar, que pide confirmación y borra el archivo y su línea del índice. |
 | Reglas | Las reglas que van al principio de cada pedido, editables. Guardar (Ctrl+S) las escribe; Descartar cambios deshace lo editado; Restaurar las originales vuelve a las reglas de fábrica. |
-| Ollama | Dónde corre Ollama: en esta computadora, o en otra por SSH (ver [Ollama en otra computadora](#ollama-en-otra-computadora)). Aplicar y probar se conecta enseguida y lista los modelos que encuentra. |
+| Ollama | Dónde corre Ollama: en esta computadora (127.0.0.1:11434), o en otra por SSH (ver [Ollama en otra computadora](#ollama-en-otra-computadora)). Aplicar y probar se conecta enseguida y lista los modelos que encuentra. |
+| Apariencia | El idioma de la interfaz (ver [Idioma](#idioma)), Como Windows, Claro u Oscuro, y el color de los botones y del ícono (ver [Tema y color](#tema-y-color)). |
+
+Si cambias el idioma o el tema con Ajustes abierto, la ventana se redibuja sin perder las reglas que
+estás editando y todavía no guardaste, ni un destino SSH que todavía no aplicaste.
 
 Cualquier carpeta puede ser la carpeta de memorias, también una que use otra herramienta, mientras
 mantenga el mismo formato de `_index.md`.
@@ -252,10 +275,12 @@ en la nube, cosa que no puede saber.
 
 ## Idioma
 
-La interfaz está en inglés y en español. El botón del globo, arriba a la derecha junto a la lista de
-modelos, muestra el idioma actual y abre el menú de idioma; el cambio se aplica al instante y se
-recuerda. En el primer arranque Citadel usa el idioma elegido durante la instalación, o inglés cuando
-corre sin instalar. El idioma de la interfaz no cambia el de las respuestas: el modelo contesta en el
+La interfaz está en inglés, en español y en japonés. El botón del globo, arriba a la derecha junto a la
+lista de modelos, muestra el idioma actual y abre el menú de idioma, y Ajustes → Apariencia tiene la
+misma elección bajo «Idioma / Language / 言語»; el cambio se aplica al instante en todas las ventanas
+abiertas y se recuerda. En el primer arranque Citadel usa el idioma elegido durante la instalación; si
+corre sin instalar, el idioma de Windows si es español o japonés, y si no, inglés. El texto en japonés
+usa las fuentes japonesas de Windows (Yu Gothic UI, o Meiryo UI). El idioma de la interfaz no cambia el de las respuestas: el modelo contesta en el
 idioma en que le escribes.
 
 ## Tema y color
@@ -264,7 +289,31 @@ Ajustes → Apariencia elige cómo se ve la ventana: como Windows (clara u oscur
 clara u oscura, que es la de fábrica. Debajo, doce colores cambian los botones, la selección y el
 resplandor detrás de la ciudadela en el ícono de la ventana y de la barra de tareas mientras Citadel está
 abierto; el verde es el original. Los accesos directos del menú Inicio y del escritorio conservan el ícono
-verde. La versión para Mac tiene las mismas opciones.
+verde. El cambio se aplica al instante en todas las ventanas abiertas y se recuerda. La versión para Mac
+tiene las mismas opciones.
+
+![Ajustes, pestaña Apariencia](docs/images/appearance-es.png)
+
+## Acerca de
+
+El botón ⓘ, abajo en la barra lateral junto a Ajustes, abre Acerca de Citadel: la versión, el autor, la
+licencia y la dirección del repositorio, que se abre en el navegador. Ver licencia abre el `LICENSE.txt`
+instalado con Citadel (o el sitio de GNU cuando corre sin instalar), Buscar actualizaciones busca una
+versión nueva en el momento (ver [Actualizaciones](#actualizaciones)) y Cerrar cierra la ventana.
+
+![Acerca de Citadel](docs/images/about-es.png)
+
+## Privacidad
+
+- Las conversaciones, las reglas, las memorias y los ajustes son archivos comunes en `%APPDATA%\Citadel`
+  (ver [Archivos](#archivos)); nada se envía a un servicio en la nube, y Citadel no tiene cuentas,
+  analíticas ni telemetría.
+- Los pedidos van solo a Ollama: en esta computadora, o en otra computadora tuya por un túnel SSH.
+- La búsqueda diaria de actualizaciones le pide a GitHub la última versión publicada de Citadel; envía la
+  versión de Citadel y nada más. Una actualización se instala solo si sus archivos llevan la firma del
+  autor.
+- El modelo solo ve lo que escribes, los archivos que adjuntas, las reglas, el índice de memorias y las
+  memorias que cargas con `/mem`. No puede leer archivos, ejecutar comandos ni navegar por la web.
 
 ## Ollama en otra computadora
 
@@ -312,22 +361,38 @@ siguiente.
 | Shift+Enter, Alt+Enter | Línea nueva |
 | Ctrl+N | Conversación nueva |
 | Ctrl+F | Buscar en las conversaciones |
-| Esc | Detener la respuesta |
+| Esc | Detener la respuesta (o la memoria que se está redactando) |
 | Ctrl+, | Ajustes |
 | Ctrl+S | Guardar las reglas (pestaña Reglas) |
+| Tab, Shift+Tab | Pasar por los cuadros de texto, las listas y los botones, también los que son solo un ícono; el botón que tiene el foco muestra un borde del color de énfasis, y Espacio o Enter lo pulsa |
+
+## Solución de problemas
+
+| Qué aparece | Qué hacer |
+|---|---|
+| La línea de estado dice «Ollama no responde en 127.0.0.1:11434. Ábrelo desde el menú Inicio o ejecuta: ollama serve» (o un mensaje dice «No se puede conectar con Ollama…») | Ollama no está corriendo. Ábrelo desde el menú Inicio (su ícono aparece en el área de notificación) o ejecuta `ollama serve` en PowerShell. Citadel vuelve a comprobar cada pocos segundos y la línea de estado pasa sola a «Ollama conectado». |
+| La lista de modelos está vacía | Ollama todavía no tiene modelos: ejecuta `ollama pull qwen3:8b` (u otro modelo) y vuelve a abrir la lista. |
+| Un modelo aparece con «(sin Razonar)» y el botón Razonar está atenuado | Ese modelo no sabe razonar. Elige otro, como Qwen3, para usar Razonar. |
+| Las respuestas son muy lentas | El modelo corre en el procesador o no entra en la memoria de la tarjeta gráfica. Prueba un modelo más chico; la primera respuesta después de arrancar incluye además el tiempo de cargar el modelo. |
+| El modelo se olvida del principio de una conversación larga o de un adjunto grande | Su ventana de contexto es demasiado chica: crea una variante con un `num_ctx` mayor, como en [Requisitos](#requisitos). |
+| «SSH a … falló» o «no respondió en 20 s» | Revisa el destino, que la otra computadora acepte SSH y que `ssh <destino>` funcione en PowerShell sin pedir contraseña. Ver [Ollama en otra computadora](#ollama-en-otra-computadora). |
+| `/save` dice «El modelo no devolvió un JSON válido.» | A los modelos chicos a veces les pasa; vuelve a probar `/save` o usa otro modelo. No se escribió nada. |
+| «Ollama devolvió una respuesta que no se entiende.» | Lo que contesta en `127.0.0.1:11434` (o por el túnel SSH) no es Ollama, o es una versión muy vieja. Cierra el otro programa que usa ese puerto, o actualiza Ollama desde <https://ollama.com/download>. |
+| Windows SmartScreen dice «Windows protegió su PC» | «Más información» → «Ejecutar de todas formas» (ver [Actualizaciones](#actualizaciones)). |
+| Falla otra cosa | Los detalles están en `%APPDATA%\Citadel\citadel.log`. |
 
 ## Archivos
 
 | Qué | Dónde |
 |---|---|
-| Programa instalado | `C:\Program Files\Citadel`, con `LICENSE.txt`, `README.txt` y `README.es.txt` |
+| Programa instalado | `C:\Program Files\Citadel`, con `LICENSE.txt`, `README.txt`, `README.es.txt` y `README.ja.txt` |
 | Conversaciones | `%APPDATA%\Citadel\conversations\`, un archivo JSON cada una |
 | Reglas | `%APPDATA%\Citadel\rules.md` |
 | Memorias (carpeta por defecto) | `%APPDATA%\Citadel\memories\`, con `_index.md` |
-| Ajustes (idioma, modelo, Razonar, carpeta de memorias, destino SSH, posición de la ventana) | `%APPDATA%\Citadel\settings.json` |
-| Registro de errores, si algo falla | `%APPDATA%\Citadel\citadel.log`, de menos de 512 KB |
+| Ajustes (idioma, modelo, Razonar, carpeta de memorias, dónde corre Ollama y destino SSH, apariencia, color, «Abrir después de exportar», posición de la ventana y si estaba maximizada) | `%APPDATA%\Citadel\settings.json` |
+| Registro de errores, si algo falla | `%APPDATA%\Citadel\citadel.log`; al pasar de 512 KB pasa a llamarse `citadel.old.log` y empieza uno nuevo |
 | Fecha de la última búsqueda de actualizaciones | `%APPDATA%\Citadel\update-check.txt` |
-| Actualización descargada (mientras se instala) | `%TEMP%\CitadelUpdate\` |
+| Actualización descargada, y el texto que se estaba escribiendo mientras se instala | `%TEMP%\CitadelUpdate\` |
 
 Los archivos se escriben en UTF-8 sin marca de orden de bytes. Las conversaciones son JSON simple con el
 mismo formato que la versión para macOS, así que se pueden copiar de una a otra.
@@ -342,8 +407,9 @@ powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 ```
 
 El primer comando compila el programa. El segundo genera todo en `dist`: el `Citadel.exe` independiente,
-`citadel.msi`, `citadel-setup.exe` y `SHA256SUMS.txt`, que se publica con ellos, firmado en `release.sig`,
-para que las actualizaciones comprueben el instalador; el WiX Toolset 5 se descarga solo como paquete de NuGet. La versión
+`citadel.msi` y `citadel-setup.exe`; el WiX Toolset 5 se descarga solo como paquete de NuGet. El script no
+escribe sumas de comprobación ni firma nada: `SHA256SUMS.txt` y su firma, `release.sig`, con los que las
+actualizaciones comprueban el instalador, se calculan y se publican aparte al crear la versión. La versión
 se fija en un solo lugar, `src\Citadel\Citadel.csproj`, y los instaladores y la ventana Acerca de la leen
 de ahí.
 
@@ -354,32 +420,39 @@ carpeta en lugar de `%APPDATA%\Citadel`, así nunca tocan las conversaciones rea
   principales contra Ollama e imprime una línea PASS o FAIL por cada control: la lista de modelos, una
   respuesta sin Razonar y otra con Razonar, Detener, `/save` (archivo, línea del índice, sin marca de
   orden de bytes) y `/mem`. Se niega a correr sobre una carpeta de memorias en uso. Antes, y sin Ollama,
-  comprueba la búsqueda, la exportación a Markdown (contra el archivo esperado) y las comprobaciones de
+  comprueba los textos de la interfaz (cada texto del programa, leído del código compilado, está en los
+  tres idiomas con las mismas marcas, como `{0}`, comandos, teclas y nombres de archivo), las etiquetas
+  `<think>` partidas entre dos fragmentos de una respuesta, las codificaciones de los adjuntos, la búsqueda, la exportación a Markdown (contra el archivo esperado) y las comprobaciones de
   las actualizaciones (comparación de versiones, `SHA256SUMS.txt`, la respuesta de la versión, una
   descarga que no coincide), con conversaciones inventadas en una carpeta temporal;
   `--self-test --offline` corre solo estas. Su salida se lee con `Start-Process Citadel.exe -ArgumentList ... -Wait -NoNewWindow -RedirectStandardOutput out.txt`.
-- `Citadel.exe --screenshot <archivo.png> --window main|settings|about|save --language en|es` dibuja una
-  ventana en una imagen y se cierra; `--search <texto>` muestra la barra lateral con los resultados de
-  una búsqueda.
+- `Citadel.exe --screenshot <archivo.png> --window main|settings|about|save --language en|es|ja` dibuja
+  una ventana en una imagen y se cierra (las rutas dentro de `--data-folder` se muestran como
+  `%APPDATA%\Citadel`, como en una instalación real); `--search <texto>` muestra la barra lateral con los resultados de
+  una búsqueda, `--tab 0|1|2|3` abre esa pestaña de Ajustes, y `--appearance auto|light|dark` y
+  `--accent <color>` (green, gold, purple, sky, ember, red, yellow, teal, blue, pink, black, white)
+  eligen el aspecto.
 
 `citadel-setup.exe /quiet /norestart /CITADELWAITPID=<pid> /CITADELRELAUNCH=1` es como una actualización
 ejecuta la instalación: espera a que ese proceso de Citadel se cierre antes de reemplazar nada y vuelve a
 abrir Citadel al terminar.
 
 `scripts\screenshots.ps1 -Demo <carpeta>` genera las imágenes de `docs\images` con conversaciones y
-memorias de demostración, `scripts/manual.sh` (en macOS, con pandoc y Google Chrome) genera los
-manuales en PDF y `README.txt` y `README.es.txt` a partir de `README.md` y de este archivo, y
+memorias de demostración (en una carpeta temporal, nunca en `%APPDATA%\Citadel`), `scripts/manual.sh`
+(en macOS o en Git Bash en Windows, con pandoc y Google Chrome) genera los tres manuales en PDF y
+`README.txt`, `README.es.txt` y `README.ja.txt` a partir de `README.md`, de este archivo y de
+`README.ja.md`, y
 `scripts/make-icon.sh` (en macOS) arma `src\Citadel\citadel.ico` a partir de `icon\citadel-1024.png`.
 
 | Carpeta | Contenido |
 |---|---|
 | `src/Citadel` | El programa. |
 | `installer/Msi` | El paquete MSI (WiX). |
-| `installer/SetupUI` | La ventana de instalación, en inglés y en español (.NET Framework 4.7.2, WPF). |
+| `installer/SetupUI` | La ventana de instalación, en inglés, en español y en japonés (.NET Framework 4.7.2, WPF). |
 | `installer/Setup` | El programa de instalación que lleva la ventana y el MSI (paquete de WiX). |
 | `scripts` | Compilación, imágenes, ícono y manuales. |
 | `icon` | El ícono, en SVG y en PNG de 1024 píxeles. |
-| `docs` | Manuales en PDF, imágenes y la hoja de estilo del manual. |
+| `docs` | Manuales en PDF en inglés, español y japonés, imágenes y la hoja de estilo del manual. |
 
 ## Notas técnicas
 
@@ -392,7 +465,8 @@ manuales en PDF y `README.txt` y `README.es.txt` a partir de `README.md` y de es
 - Las respuestas llegan de `/api/chat` como un objeto JSON por línea. Detener cancela el pedido, lo que
   cierra la conexión; Ollama entonces cancela la generación, como muestra su registro
   (`srv stop: cancel task`). También se atienden los modelos que escriben su razonamiento entre
-  etiquetas `<think>` en lugar de usar el campo `thinking`.
+  etiquetas `<think>` en lugar de usar el campo `thinking`, aunque una etiqueta llegue partida entre dos
+  fragmentos de la respuesta.
 - En 15 preguntas difíciles de conteo, cuentas, lógica y fechas, hechas dos veces cada una, Qwen3 8B
   acertó 9 de 30 sin razonar y 26 de 30 razonando. Razonando, la respuesta mediana tardó 38 segundos y
   la más lenta 172, en una computadora donde el modelo escribe unos 17 tokens por segundo. A veces el
@@ -412,12 +486,14 @@ manuales en PDF y `README.txt` y `README.es.txt` a partir de `README.md` y de es
 ## Créditos
 
 Citadel usa [Ollama](https://ollama.com) (licencia MIT) para correr los modelos, que se descargan aparte
-con sus propias licencias. Qwen3 lo publica el equipo de Qwen con licencia Apache 2.0. Los instaladores
-se arman con el [WiX Toolset](https://wixtoolset.org) (licencia MS-RL).
+con sus propias licencias. Qwen3 lo publica el equipo de Qwen con licencia Apache 2.0. `Citadel.exe`
+trae el entorno de [.NET](https://dotnet.microsoft.com) (licencia MIT). Los instaladores se arman con el
+[WiX Toolset](https://wixtoolset.org) (licencia MS-RL), cuya biblioteca para ventanas de instalación usa
+la ventana de instalación.
 
 ## Historial de versiones
 
-Ver [`CHANGELOG.md`](CHANGELOG.md).
+Ver [`CHANGELOG.es.md`](CHANGELOG.es.md).
 
 ## Licencia
 

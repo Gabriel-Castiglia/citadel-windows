@@ -32,12 +32,13 @@ internal static class Program
         // Maintenance options (not shown to users):
         //   --data-folder <folder>     use this folder instead of %APPDATA%\Citadel
         //   --memory-folder <folder>   use this memory folder
-        //   --language en|es           interface language for this run
+        //   --language en|es|ja        interface language for this run
         //   --self-test                run the main features against Ollama and print PASS/FAIL lines;
         //                              with --offline, only the checks that need no Ollama
         //   --screenshot <file.png>    render a window to a PNG and exit; --window main|settings|about|save,
         //                              --tab N (settings), --appearance auto|light|dark, --accent KEY,
-        //                              --search TEXT (main: the sidebar shows the results of a search)
+        //                              --search TEXT (main: the sidebar shows the results of a search);
+        //                              paths inside --data-folder are shown as %APPDATA%\Citadel
         //   --updated                  started by the setup after an update (a short note says so)
         string shot = null, window = "main", language = null, appearance = null, accent = null, search = null;
         bool selfTest = false, offline = false;
@@ -61,13 +62,18 @@ internal static class Program
         }
         bool test = selfTest || shot != null;
 
-        // One window at a time; tests run separately.
+        // One window at a time; tests run separately. Starting Citadel again brings the open window to the front.
         Mutex single = null;
         if (!test)
         {
             single = new Mutex(true, @"Local\Citadel.Single", out bool created);
-            if (!created) return 0;
+            if (!created)
+            {
+                ShowRunning();
+                return 0;
+            }
         }
+        if (shot != null) Paths.ShowDataAsDefault = true;
 
         var app = new Application { ThemeMode = ThemeMode.Dark, ShutdownMode = test ? ShutdownMode.OnExplicitShutdown : ShutdownMode.OnMainWindowClose };
         app.DispatcherUnhandledException += (s, e) => { Log(e.Exception.ToString()); e.Handled = true; };
@@ -106,6 +112,7 @@ internal static class Program
     /// <summary>Shows one window off to the side, waits for Ollama's status, and saves its picture.</summary>
     private static async Task<bool> Screenshot(ChatModel model, MainWindow main, string which, string path, string search)
     {
+        main.WindowState = WindowState.Normal;
         main.Width = 1180;
         main.Height = 760;
         main.WindowStartupLocation = WindowStartupLocation.Manual;
@@ -148,6 +155,38 @@ internal static class Program
         Console.WriteLine(ok ? "screenshot saved: " + path : "screenshot failed");
         foreach (Window w in Application.Current.Windows.OfType<Window>().ToList()) if (w is not MainWindow) w.Close();
         return ok;
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hwnd);
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hwnd, int command);
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool IsIconic(IntPtr hwnd);
+
+    /// <summary>
+    /// Brings the Citadel that is already open in this Windows session to the front, restoring it when it is
+    /// minimized. The new process was started by the user, so Windows lets it give the focus away.
+    /// </summary>
+    private static void ShowRunning()
+    {
+        try
+        {
+            using var me = System.Diagnostics.Process.GetCurrentProcess();
+            foreach (var p in System.Diagnostics.Process.GetProcessesByName(me.ProcessName))
+            {
+                using (p)
+                {
+                    if (p.Id == me.Id || p.SessionId != me.SessionId) continue;
+                    IntPtr hwnd = p.MainWindowHandle;
+                    if (hwnd == IntPtr.Zero) continue;
+                    ShowWindow(hwnd, IsIconic(hwnd) ? 9 : 5);   // SW_RESTORE : SW_SHOW
+                    SetForegroundWindow(hwnd);
+                    return;
+                }
+            }
+        }
+        catch (Exception ex) { Log("Could not show the open window: " + ex.Message); }
     }
 
     /// <summary>Renders a window's content at twice its size to a PNG file.</summary>
